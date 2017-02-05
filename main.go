@@ -3,12 +3,15 @@ package main
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/riobard/go-shadowsocks2/cipher"
 )
 
 var config struct {
@@ -50,7 +53,11 @@ func main() {
 	flag.Parse()
 
 	if flags.Cipher == "" {
-		printCiphers(os.Stderr)
+		ls := cipher.ListCiphers()
+		fmt.Fprintf(os.Stderr, "# available ciphers\n")
+		for _, each := range ls {
+			fmt.Fprintf(os.Stderr, "%s\n", each)
+		}
 		return
 	}
 
@@ -59,7 +66,7 @@ func main() {
 		log.Fatalf("key: %v", err)
 	}
 
-	streamCipher, packetCipher, err := pickCipher(flags.Cipher, key)
+	streamCipher, packetCipher, err := cipher.MakeCipher(flags.Cipher, key)
 	if err != nil {
 		log.Fatalf("cipher: %v", err)
 	}

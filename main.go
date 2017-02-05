@@ -1,17 +1,17 @@
 package main
 
 import (
-	"encoding/hex"
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/riobard/go-shadowsocks2/cipher"
 )
 
 var config struct {
@@ -32,6 +32,8 @@ func main() {
 		Server    string
 		Cipher    string
 		Key       string
+		Password  string
+		Keygen    int
 		Socks     string
 		RedirTCP  string
 		RedirTCP6 string
@@ -41,7 +43,9 @@ func main() {
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
 	flag.StringVar(&flags.Cipher, "cipher", "", "cipher")
-	flag.StringVar(&flags.Key, "key", "", "secret key in hexadecimal")
+	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key")
+	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
+	flag.StringVar(&flags.Password, "password", "", "password")
 	flag.StringVar(&flags.Server, "s", "", "server listen address")
 	flag.StringVar(&flags.Client, "c", "", "client connect address")
 	flag.StringVar(&flags.Socks, "socks", ":1080", "(client-only) SOCKS listen address")
@@ -52,8 +56,20 @@ func main() {
 	flag.DurationVar(&config.UDPTimeout, "udptimeout", 5*time.Minute, "UDP tunnel timeout")
 	flag.Parse()
 
+	if flags.Keygen > 0 {
+		key := make([]byte, flags.Keygen)
+		io.ReadFull(rand.Reader, key)
+		fmt.Println(base64.URLEncoding.EncodeToString(key))
+		return
+	}
+
+	if flags.Client == "" && flags.Server == "" {
+		flag.Usage()
+		return
+	}
+
 	if flags.Cipher == "" {
-		ls := cipher.List()
+		ls := listCipher()
 		fmt.Fprintf(os.Stderr, "# available ciphers\n")
 		for _, each := range ls {
 			fmt.Fprintf(os.Stderr, "%s\n", each)
@@ -61,12 +77,16 @@ func main() {
 		return
 	}
 
-	key, err := hex.DecodeString(flags.Key)
-	if err != nil {
-		log.Fatalf("key: %v", err)
+	var key []byte
+	if flags.Key != "" {
+		k, err := base64.URLEncoding.DecodeString(flags.Key)
+		if err != nil {
+			log.Fatalf("key: %v", err)
+		}
+		key = k
 	}
 
-	streamCipher, packetCipher, err := cipher.New(flags.Cipher, key)
+	streamCipher, packetCipher, err := pickCipher(flags.Cipher, key, flags.Password)
 	if err != nil {
 		log.Fatalf("cipher: %v", err)
 	}
@@ -97,12 +117,11 @@ func main() {
 		if flags.RedirTCP6 != "" {
 			go redir6Local(flags.RedirTCP6, flags.Client, streamCipher)
 		}
-	} else if flags.Server != "" { // server mode
+	}
+
+	if flags.Server != "" { // server mode
 		go udpRemote(flags.Server, packetCipher)
 		go tcpRemote(flags.Server, streamCipher)
-	} else {
-		flag.Usage()
-		return
 	}
 
 	sigCh := make(chan os.Signal, 1)

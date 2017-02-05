@@ -3,22 +3,12 @@ package cipher
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"net"
 
 	"github.com/Yawning/chacha20"
-	"github.com/riobard/go-shadowsocks2/core"
 	"github.com/riobard/go-shadowsocks2/shadowstream"
 )
 
 // Stream ciphers
-
-func streamStream(ciph shadowstream.Cipher) core.StreamConnCipher {
-	return func(c net.Conn) net.Conn { return shadowstream.NewConn(c, ciph) }
-}
-
-func streamPacket(ciph shadowstream.Cipher) core.PacketConnCipher {
-	return func(c net.PacketConn) net.PacketConn { return shadowstream.NewPacketConn(c, ciph) }
-}
 
 // CTR mode
 type ctrStream struct{ cipher.Block }
@@ -27,7 +17,7 @@ func (b *ctrStream) IVSize() int                       { return b.BlockSize() }
 func (b *ctrStream) Decrypter(iv []byte) cipher.Stream { return b.Encrypter(iv) }
 func (b *ctrStream) Encrypter(iv []byte) cipher.Stream { return cipher.NewCTR(b, iv) }
 
-func aesCTR(key []byte) (shadowstream.Cipher, error) {
+func AESCTR(key []byte) (shadowstream.Cipher, error) {
 	blk, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -42,12 +32,12 @@ func (b *cfbStream) IVSize() int                       { return b.BlockSize() }
 func (b *cfbStream) Decrypter(iv []byte) cipher.Stream { return cipher.NewCFBDecrypter(b, iv) }
 func (b *cfbStream) Encrypter(iv []byte) cipher.Stream { return cipher.NewCFBEncrypter(b, iv) }
 
-func aesCFB(key []byte) (shadowstream.Cipher, error) {
+func AESCFB(key []byte) (shadowstream.Cipher, error) {
 	blk, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	return &ctrStream{blk}, nil
+	return &cfbStream{blk}, nil
 }
 
 // IETF-variant of chacha20
@@ -63,9 +53,9 @@ func (k chacha20ietfkey) Encrypter(iv []byte) cipher.Stream {
 	return ciph
 }
 
-func newChacha20ietf(key []byte) (shadowstream.Cipher, error) {
+func Chacha20IETF(key []byte) (shadowstream.Cipher, error) {
 	if len(key) != chacha20.KeySize {
-		return nil, ErrKeySize
+		return nil, KeySizeError(chacha20.KeySize)
 	}
 	return chacha20ietfkey(key), nil
 }

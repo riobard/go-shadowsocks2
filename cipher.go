@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/cipher"
 	"crypto/md5"
-	"fmt"
+	"errors"
 	"net"
 	"sort"
 	"strings"
@@ -13,6 +13,8 @@ import (
 	"github.com/riobard/go-shadowsocks2/shadowaead"
 	"github.com/riobard/go-shadowsocks2/shadowstream"
 )
+
+var errCipherNotSupported = errors.New("ciper not supported")
 
 // List of AEAD ciphers: key size in bytes and constructor
 var aeadList = map[string]struct {
@@ -68,7 +70,7 @@ func pickCipher(name string, key []byte, password string) (core.StreamConnCipher
 			key = kdf(password, choice.KeySize)
 		}
 		if len(key) != choice.KeySize {
-			return nil, nil, fmt.Errorf("key size error: need %d-byte key", choice.KeySize)
+			return nil, nil, sscipher.KeySizeError(choice.KeySize)
 		}
 		aead, err := choice.New(key)
 		return aeadStream(aead), aeadPacket(aead), err
@@ -79,13 +81,13 @@ func pickCipher(name string, key []byte, password string) (core.StreamConnCipher
 			key = kdf(password, choice.KeySize)
 		}
 		if len(key) != choice.KeySize {
-			return nil, nil, fmt.Errorf("key size error: need %d-byte key", choice.KeySize)
+			return nil, nil, sscipher.KeySizeError(choice.KeySize)
 		}
 		ciph, err := choice.New(key)
 		return streamStream(ciph), streamPacket(ciph), err
 	}
 
-	return nil, nil, fmt.Errorf("cipher %q not supported", name)
+	return nil, nil, errCipherNotSupported
 }
 
 func aeadStream(aead cipher.AEAD) core.StreamConnCipher {

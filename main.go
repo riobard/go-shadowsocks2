@@ -37,7 +37,7 @@ func main() {
 	}
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
-	flag.StringVar(&flags.Cipher, "cipher", "aes-128-gcm", "cipher to encrypt/decrypt")
+	flag.StringVar(&flags.Cipher, "cipher", "", "cipher")
 	flag.StringVar(&flags.Key, "key", "", "secret key in hexadecimal")
 	flag.StringVar(&flags.Server, "s", "", "server listen address")
 	flag.StringVar(&flags.Client, "c", "", "client connect address")
@@ -49,14 +49,19 @@ func main() {
 	flag.DurationVar(&config.UDPTimeout, "udptimeout", 5*time.Minute, "UDP tunnel timeout")
 	flag.Parse()
 
+	if flags.Cipher == "" {
+		printCiphers(os.Stderr)
+		return
+	}
+
 	key, err := hex.DecodeString(flags.Key)
 	if err != nil {
-		log.Fatalf("failed to parse key: %v", err)
+		log.Fatalf("key: %v", err)
 	}
 
 	streamCipher, packetCipher, err := pickCipher(flags.Cipher, key)
 	if err != nil {
-		log.Fatalf("failed to create cipher %s: %v", flags.Cipher, err)
+		log.Fatalf("cipher: %v", err)
 	}
 
 	if flags.Client != "" { // client mode

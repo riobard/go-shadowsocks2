@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/cipher"
 	"crypto/md5"
-	"errors"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -12,11 +12,6 @@ import (
 	"github.com/riobard/go-shadowsocks2/core"
 	"github.com/riobard/go-shadowsocks2/shadowaead"
 	"github.com/riobard/go-shadowsocks2/shadowstream"
-)
-
-var (
-	errCipherNotSupported = errors.New("cipher not supported")
-	errKeySize            = errors.New("key size error")
 )
 
 // List of AEAD ciphers: key size in bytes and constructor
@@ -60,7 +55,7 @@ func listCipher() []string {
 	return l
 }
 
-// non-empty key selects AEAD ciphers; otherwise use password with stream ciphers.
+// derive key from password if given key is empty
 func pickCipher(name string, key []byte, password string) (core.StreamConnCipher, core.PacketConnCipher, error) {
 	name = strings.ToLower(name)
 
@@ -68,21 +63,29 @@ func pickCipher(name string, key []byte, password string) (core.StreamConnCipher
 		return dummyStream(), dummyPacket(), nil
 	}
 
-	if choice, ok := aeadList[name]; len(key) > 0 && ok {
+	if choice, ok := aeadList[name]; ok {
+		if len(key) == 0 {
+			key = kdf(password, choice.KeySize)
+		}
 		if len(key) != choice.KeySize {
-			return nil, nil, errKeySize
+			return nil, nil, fmt.Errorf("key size error: need %d-byte key", choice.KeySize)
 		}
 		aead, err := choice.New(key)
 		return aeadStream(aead), aeadPacket(aead), err
 	}
 
 	if choice, ok := streamList[name]; ok {
-		key := kdf(password, choice.KeySize)
+		if len(key) == 0 {
+			key = kdf(password, choice.KeySize)
+		}
+		if len(key) != choice.KeySize {
+			return nil, nil, fmt.Errorf("key size error: need %d-byte key", choice.KeySize)
+		}
 		ciph, err := choice.New(key)
 		return streamStream(ciph), streamPacket(ciph), err
 	}
 
-	return nil, nil, errCipherNotSupported
+	return nil, nil, fmt.Errorf("cipher %q not supported", name)
 }
 
 func aeadStream(aead cipher.AEAD) core.StreamConnCipher {

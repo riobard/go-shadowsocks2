@@ -43,7 +43,7 @@ func main() {
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
 	flag.StringVar(&flags.Cipher, "cipher", "", "cipher")
-	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key")
+	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key (derive from password if empty)")
 	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
 	flag.StringVar(&flags.Password, "password", "", "password")
 	flag.StringVar(&flags.Server, "s", "", "server listen address")
@@ -81,14 +81,14 @@ func main() {
 	if flags.Key != "" {
 		k, err := base64.URLEncoding.DecodeString(flags.Key)
 		if err != nil {
-			log.Fatalf("key: %v", err)
+			log.Fatal(err)
 		}
 		key = k
 	}
 
 	streamCipher, packetCipher, err := pickCipher(flags.Cipher, key, flags.Password)
 	if err != nil {
-		log.Fatalf("cipher: %v", err)
+		log.Fatal(err)
 	}
 
 	if flags.Client != "" { // client mode

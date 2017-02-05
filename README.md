@@ -22,14 +22,22 @@ go install github.com/riobard/go-shadowsocks2
 
 ## Basic Usage
 
+### Key generation
+
+A random key is almost always better than a password. You can generate a base64url-encoded 16-byte random key with
+
+```sh
+go-shadowsocks -keygen 16
+```
+
 
 ### Server
 
-Start a server listening on port 8848 using `aes-128-gcm` AEAD cipher with a 128-bit key in hexdecimal.
+Start a server listening on port 8848 using `aes-128-gcm` AEAD cipher with a base64url-encoded 16-byte key.
 
 
 ```sh
-go-shadowsocks2 -s :8488 -cipher aes-128-gcm -key 1234567890abcdef1234567890abcdef -verbose
+go-shadowsocks2 -s :8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
 ```
 
 
@@ -41,7 +49,7 @@ connections, and tunnels UDP packets received on port 1080 and port 1081 to 8.8.
 respectively. 
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key 1234567890abcdef1234567890abcdef \
+go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== \
     -socks :1080 -udptun :1080=8.8.8.8:53,:1081=8.8.4.4:53 -verbose
 ```
 
@@ -60,7 +68,7 @@ Start a client listening on port 1082 for redirected TCP connections and port 10
 TCP IPv6 connections.
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key 1234567890abcdef1234567890abcdef \
+go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== \
     -redir :1082 -redir6 :1083
 ```
 
@@ -82,7 +90,7 @@ Start a client on the same machine with the server. The client listens on port 1
 and tunnels to localhost:5201 where iperf3 is listening.
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key 1234567890abcdef1234567890abcdef \
+go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== \
     -tcptun :1090=localhost:5201
 ```
 

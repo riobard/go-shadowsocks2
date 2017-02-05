@@ -46,8 +46,8 @@ var streamList = map[string]struct {
 	"chacha20-ietf": {32, newChacha20ietf},
 }
 
-// ListCiphers returns a list of available cipher names sorted alphabetically.
-func ListCiphers() []string {
+// List returns a list of available cipher names sorted alphabetically.
+func List() []string {
 	var l []string
 	for k := range aeadList {
 		l = append(l, k)
@@ -59,8 +59,8 @@ func ListCiphers() []string {
 	return l
 }
 
-// MakeCipher returns a pair of ciphers for the given key.
-func MakeCipher(name string, key []byte) (core.StreamConnCipher, core.PacketConnCipher, error) {
+// New returns a pair of ciphers for the given key.
+func New(name string, key []byte) (core.StreamConnCipher, core.PacketConnCipher, error) {
 	name = strings.ToLower(name)
 
 	if choice, ok := aeadList[name]; ok {

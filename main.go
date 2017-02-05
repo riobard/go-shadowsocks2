@@ -53,7 +53,7 @@ func main() {
 	flag.Parse()
 
 	if flags.Cipher == "" {
-		ls := cipher.ListCiphers()
+		ls := cipher.List()
 		fmt.Fprintf(os.Stderr, "# available ciphers\n")
 		for _, each := range ls {
 			fmt.Fprintf(os.Stderr, "%s\n", each)
@@ -66,7 +66,7 @@ func main() {
 		log.Fatalf("key: %v", err)
 	}
 
-	streamCipher, packetCipher, err := cipher.MakeCipher(flags.Cipher, key)
+	streamCipher, packetCipher, err := cipher.New(flags.Cipher, key)
 	if err != nil {
 		log.Fatalf("cipher: %v", err)
 	}

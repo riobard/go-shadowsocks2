@@ -4,8 +4,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/riobard/go-shadowsocks2/core"
-	"github.com/riobard/go-shadowsocks2/socks"
+	"github.com/shadowsocks/go-shadowsocks2/core"
+	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
 // Create a SOCKS server listening on addr and proxy to server.

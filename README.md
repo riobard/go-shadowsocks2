@@ -2,7 +2,7 @@
 
 A fresh implementation of Shadowsocks in Go.
 
-GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
+GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
 
 ## Features
@@ -16,7 +16,7 @@ GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
 ## Install
 
 ```sh
-go install github.com/riobard/go-shadowsocks2
+go install github.com/shadowsocks/go-shadowsocks2
 ```
 
 
@@ -27,7 +27,7 @@ go install github.com/riobard/go-shadowsocks2
 A random key is almost always better than a password. You can generate a base64url-encoded 16-byte random key with
 
 ```sh
-go-shadowsocks -keygen 16
+go-shadowsocks2 -keygen 16
 ```
 
 

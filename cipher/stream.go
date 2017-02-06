@@ -5,7 +5,7 @@ import (
 	"crypto/cipher"
 
 	"github.com/Yawning/chacha20"
-	"github.com/riobard/go-shadowsocks2/shadowstream"
+	"github.com/shadowsocks/go-shadowsocks2/shadowstream"
 )
 
 // Stream ciphers

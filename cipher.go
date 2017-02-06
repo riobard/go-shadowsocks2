@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	sscipher "github.com/riobard/go-shadowsocks2/cipher"
-	"github.com/riobard/go-shadowsocks2/core"
-	"github.com/riobard/go-shadowsocks2/shadowaead"
-	"github.com/riobard/go-shadowsocks2/shadowstream"
+	sscipher "github.com/shadowsocks/go-shadowsocks2/cipher"
+	"github.com/shadowsocks/go-shadowsocks2/core"
+	"github.com/shadowsocks/go-shadowsocks2/shadowaead"
+	"github.com/shadowsocks/go-shadowsocks2/shadowstream"
 )
 
 var errCipherNotSupported = errors.New("ciper not supported")

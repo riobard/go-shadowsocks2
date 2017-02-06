@@ -27,7 +27,7 @@ go install github.com/riobard/go-shadowsocks2
 A random key is almost always better than a password. You can generate a base64url-encoded 16-byte random key with
 
 ```sh
-go-shadowsocks -keygen 16
+go-shadowsocks2 -keygen 16
 ```
 
 

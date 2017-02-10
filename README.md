@@ -16,7 +16,7 @@ GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 ## Install
 
 ```sh
-go install github.com/shadowsocks/go-shadowsocks2
+go get github.com/shadowsocks/go-shadowsocks2
 ```
 
 

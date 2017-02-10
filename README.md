@@ -16,7 +16,7 @@ GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
 ## Install
 
 ```sh
-go install github.com/riobard/go-shadowsocks2
+go get github.com/riobard/go-shadowsocks2
 ```
 
 

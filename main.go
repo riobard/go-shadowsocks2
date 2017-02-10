@@ -42,7 +42,7 @@ func main() {
 	}
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
-	flag.StringVar(&flags.Cipher, "cipher", "", "cipher")
+	flag.StringVar(&flags.Cipher, "cipher", "aes-128-gcm-16", "available ciphers: "+strings.Join(listCipher(), " "))
 	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key (derive from password if empty)")
 	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
 	flag.StringVar(&flags.Password, "password", "", "password")
@@ -65,15 +65,6 @@ func main() {
 
 	if flags.Client == "" && flags.Server == "" {
 		flag.Usage()
-		return
-	}
-
-	if flags.Cipher == "" {
-		ls := listCipher()
-		fmt.Fprintf(os.Stderr, "# available ciphers\n")
-		for _, each := range ls {
-			fmt.Fprintf(os.Stderr, "%s\n", each)
-		}
 		return
 	}
 

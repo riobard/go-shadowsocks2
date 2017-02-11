@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/riobard/go-shadowsocks2/core"
 )
 
 var config struct {
@@ -42,7 +44,7 @@ func main() {
 	}
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
-	flag.StringVar(&flags.Cipher, "cipher", "chacha20-ietf-poly1305", "available ciphers: "+strings.Join(listCipher(), " "))
+	flag.StringVar(&flags.Cipher, "cipher", "chacha20-ietf-poly1305", "available ciphers: "+strings.Join(core.ListCipher(), " "))
 	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key (derive from password if empty)")
 	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
 	flag.StringVar(&flags.Password, "password", "", "password")
@@ -77,7 +79,7 @@ func main() {
 		key = k
 	}
 
-	ciph, err := pickCipher(flags.Cipher, key, flags.Password)
+	ciph, err := core.PickCipher(flags.Cipher, key, flags.Password)
 	if err != nil {
 		log.Fatal(err)
 	}

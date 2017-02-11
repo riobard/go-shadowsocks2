@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"crypto/md5"
@@ -7,12 +7,25 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riobard/go-shadowsocks2/core"
 	"github.com/riobard/go-shadowsocks2/shadowaead"
 	"github.com/riobard/go-shadowsocks2/shadowstream"
 )
 
-var errCipherNotSupported = errors.New("ciper not supported")
+type Cipher interface {
+	StreamConnCipher
+	PacketConnCipher
+}
+
+type StreamConnCipher interface {
+	StreamConn(net.Conn) net.Conn
+}
+
+type PacketConnCipher interface {
+	PacketConn(net.PacketConn) net.PacketConn
+}
+
+// ErrCipherNotSupported occurs when a cipher is not supported (likely because of security concerns).
+var ErrCipherNotSupported = errors.New("cipher not supported")
 
 // List of AEAD ciphers: key size in bytes and constructor
 var aeadList = map[string]struct {
@@ -39,8 +52,8 @@ var streamList = map[string]struct {
 	"chacha20-ietf": {32, shadowstream.Chacha20IETF},
 }
 
-// listCipher returns a list of available cipher names sorted alphabetically.
-func listCipher() []string {
+// ListCipher returns a list of available cipher names sorted alphabetically.
+func ListCipher() []string {
 	var l []string
 	for k := range aeadList {
 		l = append(l, k)
@@ -52,8 +65,8 @@ func listCipher() []string {
 	return l
 }
 
-// derive key from password if given key is empty
-func pickCipher(name string, key []byte, password string) (core.Cipher, error) {
+// PickCipher returns a Cipher of the given name. Derive key from password if given key is empty.
+func PickCipher(name string, key []byte, password string) (Cipher, error) {
 	name = strings.ToLower(name)
 
 	if name == "dummy" {
@@ -82,7 +95,7 @@ func pickCipher(name string, key []byte, password string) (core.Cipher, error) {
 		return &streamCipher{ciph}, err
 	}
 
-	return nil, errCipherNotSupported
+	return nil, ErrCipherNotSupported
 }
 
 type aeadCipher struct{ shadowaead.Cipher }

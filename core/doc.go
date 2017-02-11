@@ -1,19 +1,2 @@
-// Package core provides essential interfaces for Shadowsocks
+// Package core implements essential parts of Shadowsocks
 package core
-
-import (
-	"net"
-)
-
-type Cipher interface {
-	StreamConnCipher
-	PacketConnCipher
-}
-
-type StreamConnCipher interface {
-	StreamConn(net.Conn) net.Conn
-}
-
-type PacketConnCipher interface {
-	PacketConn(net.PacketConn) net.PacketConn
-}

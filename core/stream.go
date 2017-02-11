@@ -2,8 +2,6 @@ package core
 
 import "net"
 
-type StreamConnCipher func(net.Conn) net.Conn
-
 type listener struct {
 	net.Listener
 	StreamConnCipher
@@ -16,10 +14,10 @@ func Listen(network, address string, ciph StreamConnCipher) (net.Listener, error
 
 func (l *listener) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
-	return l.StreamConnCipher(c), err
+	return l.StreamConn(c), err
 }
 
 func Dial(network, address string, ciph StreamConnCipher) (net.Conn, error) {
 	c, err := net.Dial(network, address)
-	return ciph(c), err
+	return ciph.StreamConn(c), err
 }

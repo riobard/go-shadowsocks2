@@ -42,7 +42,7 @@ func main() {
 	}
 
 	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
-	flag.StringVar(&flags.Cipher, "cipher", "aes-128-gcm-16", "available ciphers: "+strings.Join(listCipher(), " "))
+	flag.StringVar(&flags.Cipher, "cipher", "chacha20-ietf-poly1305", "available ciphers: "+strings.Join(listCipher(), " "))
 	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key (derive from password if empty)")
 	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
 	flag.StringVar(&flags.Password, "password", "", "password")
@@ -77,7 +77,7 @@ func main() {
 		key = k
 	}
 
-	streamCipher, packetCipher, err := pickCipher(flags.Cipher, key, flags.Password)
+	ciph, err := pickCipher(flags.Cipher, key, flags.Password)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,33 +86,33 @@ func main() {
 		if flags.UDPTun != "" {
 			for _, tun := range strings.Split(flags.UDPTun, ",") {
 				p := strings.Split(tun, "=")
-				go udpLocal(p[0], flags.Client, p[1], packetCipher)
+				go udpLocal(p[0], flags.Client, p[1], ciph)
 			}
 		}
 
 		if flags.TCPTun != "" {
 			for _, tun := range strings.Split(flags.TCPTun, ",") {
 				p := strings.Split(tun, "=")
-				go tcpTun(p[0], flags.Client, p[1], streamCipher)
+				go tcpTun(p[0], flags.Client, p[1], ciph)
 			}
 		}
 
 		if flags.Socks != "" {
-			go socksLocal(flags.Socks, flags.Client, streamCipher)
+			go socksLocal(flags.Socks, flags.Client, ciph)
 		}
 
 		if flags.RedirTCP != "" {
-			go redirLocal(flags.RedirTCP, flags.Client, streamCipher)
+			go redirLocal(flags.RedirTCP, flags.Client, ciph)
 		}
 
 		if flags.RedirTCP6 != "" {
-			go redir6Local(flags.RedirTCP6, flags.Client, streamCipher)
+			go redir6Local(flags.RedirTCP6, flags.Client, ciph)
 		}
 	}
 
 	if flags.Server != "" { // server mode
-		go udpRemote(flags.Server, packetCipher)
-		go tcpRemote(flags.Server, streamCipher)
+		go udpRemote(flags.Server, ciph)
+		go tcpRemote(flags.Server, ciph)
 	}
 
 	sigCh := make(chan os.Signal, 1)

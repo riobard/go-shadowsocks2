@@ -19,19 +19,15 @@ type writer struct {
 }
 
 // NewWriter wraps an io.Writer with AEAD encryption.
-func NewWriter(w io.Writer, aead cipher.AEAD) io.Writer {
-	return &writer{Writer: w, AEAD: aead}
-}
+func NewWriter(w io.Writer, aead cipher.AEAD) io.Writer { return newWriter(w, aead) }
 
-func (w *writer) init() error {
-	w.buf = make([]byte, 2+w.Overhead()+payloadSizeMask+w.Overhead())
-	w.nonce = make([]byte, w.NonceSize())
-	_, err := io.ReadFull(rand.Reader, w.nonce)
-	if err != nil {
-		return err
+func newWriter(w io.Writer, aead cipher.AEAD) *writer {
+	return &writer{
+		Writer: w,
+		AEAD:   aead,
+		buf:    make([]byte, 2+aead.Overhead()+payloadSizeMask+aead.Overhead()),
+		nonce:  make([]byte, aead.NonceSize()),
 	}
-	_, err = w.Writer.Write(w.nonce)
-	return err
 }
 
 // Write encrypts b and writes to the embedded io.Writer.
@@ -44,12 +40,6 @@ func (w *writer) Write(b []byte) (int, error) {
 // writes to the embedded io.Writer. Returns number of bytes read from r and
 // any error encountered.
 func (w *writer) ReadFrom(r io.Reader) (n int64, err error) {
-	if w.nonce == nil {
-		if err := w.init(); err != nil {
-			return 0, err
-		}
-	}
-
 	for {
 		buf := w.buf
 		payloadBuf := buf[2+w.Overhead() : 2+w.Overhead()+payloadSizeMask]
@@ -93,25 +83,19 @@ type reader struct {
 }
 
 // NewReader wraps an io.Reader with AEAD decryption.
-func NewReader(r io.Reader, aead cipher.AEAD) io.Reader {
-	return &reader{Reader: r, AEAD: aead}
-}
+func NewReader(r io.Reader, aead cipher.AEAD) io.Reader { return newReader(r, aead) }
 
-func (r *reader) init() error {
-	r.buf = make([]byte, payloadSizeMask+r.Overhead())
-	r.nonce = make([]byte, r.NonceSize())
-	_, err := io.ReadFull(r.Reader, r.nonce)
-	return err
+func newReader(r io.Reader, aead cipher.AEAD) *reader {
+	return &reader{
+		Reader: r,
+		AEAD:   aead,
+		buf:    make([]byte, payloadSizeMask+aead.Overhead()),
+		nonce:  make([]byte, aead.NonceSize()),
+	}
 }
 
 // read and decrypt a record into the internal buffer. Return decrypted payload length and any error encountered.
 func (r *reader) read() (int, error) {
-	if r.nonce == nil {
-		if err := r.init(); err != nil {
-			return 0, err
-		}
-	}
-
 	// decrypt payload size
 	buf := r.buf[:2+r.Overhead()]
 	_, err := io.ReadFull(r.Reader, buf)
@@ -187,10 +171,14 @@ func (r *reader) WriteTo(w io.Writer) (n int64, err error) {
 	return n, err
 }
 
-type streamConn struct {
-	net.Conn
-	r *reader
-	w *writer
+// increment little-endian encoded unsigned integer b. Wrap around on overflow.
+func increment(b []byte) {
+	for i := range b {
+		b[i]++
+		if b[i] != 0 {
+			return
+		}
+	}
 }
 
 type closeWriter interface {
@@ -201,19 +189,78 @@ type closeReader interface {
 	CloseRead() error
 }
 
+type streamConn struct {
+	net.Conn
+	Cipher
+	r *reader
+	w *writer
+}
+
+func (c *streamConn) initReader() error {
+	salt := make([]byte, c.SaltSize())
+	if _, err := io.ReadFull(c.Conn, salt); err != nil {
+		return err
+	}
+
+	aead, err := c.Decrypter(salt)
+	if err != nil {
+		return err
+	}
+
+	c.r = newReader(c.Conn, aead)
+	return nil
+}
+
 func (c *streamConn) Read(b []byte) (int, error) {
+	if c.r == nil {
+		if err := c.initReader(); err != nil {
+			return 0, err
+		}
+	}
 	return c.r.Read(b)
 }
 
 func (c *streamConn) WriteTo(w io.Writer) (int64, error) {
+	if c.r == nil {
+		if err := c.initReader(); err != nil {
+			return 0, err
+		}
+	}
 	return c.r.WriteTo(w)
 }
 
+func (c *streamConn) initWriter() error {
+	salt := make([]byte, c.SaltSize())
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return err
+	}
+	aead, err := c.Encrypter(salt)
+	if err != nil {
+		return err
+	}
+	_, err = c.Conn.Write(salt)
+	if err != nil {
+		return err
+	}
+	c.w = newWriter(c.Conn, aead)
+	return nil
+}
+
 func (c *streamConn) Write(b []byte) (int, error) {
+	if c.w == nil {
+		if err := c.initWriter(); err != nil {
+			return 0, err
+		}
+	}
 	return c.w.Write(b)
 }
 
 func (c *streamConn) ReadFrom(r io.Reader) (int64, error) {
+	if c.w == nil {
+		if err := c.initWriter(); err != nil {
+			return 0, err
+		}
+	}
 	return c.w.ReadFrom(r)
 }
 
@@ -231,19 +278,5 @@ func (c *streamConn) CloseWrite() error {
 	return nil
 }
 
-// NewConn wraps a stream-oriented net.Conn with AEAD protection.
-func NewConn(c net.Conn, aead cipher.AEAD) net.Conn {
-	r := &reader{Reader: c, AEAD: aead}
-	w := &writer{Writer: c, AEAD: aead}
-	return &streamConn{Conn: c, r: r, w: w}
-}
-
-// increment little-endian encoded unsigned integer b. Wrap around on overflow.
-func increment(b []byte) {
-	for i := range b {
-		b[i]++
-		if b[i] != 0 {
-			return
-		}
-	}
-}
+// NewConn wraps a stream-oriented net.Conn with cipher.
+func NewConn(c net.Conn, ciph Cipher) net.Conn { return &streamConn{Conn: c, Cipher: ciph} }

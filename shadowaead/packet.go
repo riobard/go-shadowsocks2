@@ -10,9 +10,9 @@ import (
 // ErrShortPacket means that the packet is too short for a valid encrypted packet.
 var ErrShortPacket = errors.New("short packet")
 
-// Pack encrypts plaintext using aead with a randomly generated nonce and
+// Pack encrypts plaintext using Cipher with a randomly generated salt and
 // returns a slice of dst containing the encrypted packet and any error occurred.
-// Ensure len(dst) >= aead.NonceSize() + len(plaintext) + aead.Overhead().
+// Ensure len(dst) >= ciph.SaltSize() + len(plaintext) + aead.Overhead().
 func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	saltSize := ciph.SaltSize()
 	salt := dst[:saltSize]
@@ -33,8 +33,8 @@ func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	return dst[:saltSize+len(b)], nil
 }
 
-// Unpack decrypts pkt using aead and returns a slice of dst containing the decrypted payload and any error occurred.
-// Ensure len(dst) >= len(pkt) - aead.NonceSize() - aead.Overhead().
+// Unpack decrypts pkt using Cipher and returns a slice of dst containing the decrypted payload and any error occurred.
+// Ensure len(dst) >= len(pkt) - aead.SaltSize() - aead.Overhead().
 func Unpack(dst, pkt []byte, ciph Cipher) ([]byte, error) {
 	saltSize := ciph.SaltSize()
 	if len(pkt) < saltSize {

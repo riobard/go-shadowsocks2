@@ -55,7 +55,7 @@ func udpLocal(laddr, server, target string, ciph core.PacketConnCipher) {
 				continue
 			}
 
-			pc = ciph(pc)
+			pc = ciph.PacketConn(pc)
 			nm.Add(raddr, c, pc)
 		}
 

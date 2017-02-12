@@ -1,2 +1,2 @@
-// Package core provides essential interfaces for Shadowsocks
+// Package core implements essential parts of Shadowsocks
 package core

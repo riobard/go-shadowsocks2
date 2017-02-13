@@ -10,6 +10,11 @@ import (
 	"github.com/riobard/go-shadowsocks2/socks"
 )
 
+const (
+	SO_ORIGINAL_DST      = 80 // from linux/include/uapi/linux/netfilter_ipv4.h
+	IP6T_SO_ORIGINAL_DST = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
+)
+
 // Listen on addr for netfilter redirected TCP connections
 func redirLocal(addr, server string, ciph core.StreamConnCipher) {
 	logf("TCP redirect %s <-> %s", addr, server)
@@ -52,11 +57,10 @@ func getOrigDst(conn net.Conn, ipv6 bool) (socks.Addr, error) {
 
 // Call getorigdst() from linux/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
 func getorigdst(fd uintptr) (socks.Addr, error) {
-	const SO_ORIGINAL_DST = 80 // from linux/include/uapi/linux/netfilter_ipv4.h
 	raw := syscall.RawSockaddrInet4{}
 	siz := unsafe.Sizeof(raw)
-	if _, _, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT, fd, syscall.IPPROTO_IP, SO_ORIGINAL_DST, uintptr(unsafe.Pointer(&raw)), uintptr(unsafe.Pointer(&siz)), 0); errno != 0 {
-		return nil, errno
+	if err := socketcall(GETSOCKOPT, fd, syscall.IPPROTO_IP, SO_ORIGINAL_DST, uintptr(unsafe.Pointer(&raw)), uintptr(unsafe.Pointer(&siz)), 0); err != nil {
+		return nil, err
 	}
 
 	addr := make([]byte, 1+net.IPv4len+2)
@@ -70,11 +74,10 @@ func getorigdst(fd uintptr) (socks.Addr, error) {
 // Call ipv6_getorigdst() from linux/net/ipv6/netfilter/nf_conntrack_l3proto_ipv6.c
 // NOTE: I haven't tried yet but it should work since Linux 3.8.
 func ipv6_getorigdst(fd uintptr) (socks.Addr, error) {
-	const IP6T_SO_ORIGINAL_DST = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
 	raw := syscall.RawSockaddrInet6{}
 	siz := unsafe.Sizeof(raw)
-	if _, _, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT, fd, syscall.IPPROTO_IPV6, IP6T_SO_ORIGINAL_DST, uintptr(unsafe.Pointer(&raw)), uintptr(unsafe.Pointer(&siz)), 0); errno != 0 {
-		return nil, errno
+	if err := socketcall(GETSOCKOPT, fd, syscall.IPPROTO_IPV6, IP6T_SO_ORIGINAL_DST, uintptr(unsafe.Pointer(&raw)), uintptr(unsafe.Pointer(&siz)), 0); err != nil {
+		return nil, err
 	}
 
 	addr := make([]byte, 1+net.IPv6len+2)

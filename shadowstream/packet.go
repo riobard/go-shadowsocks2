@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 )
 
 // ErrShortPacket means the packet is too short to be a valid encrypted packet.
@@ -45,16 +46,19 @@ func Unpack(dst, pkt []byte, s Cipher) ([]byte, error) {
 type packetConn struct {
 	net.PacketConn
 	Cipher
+	buf        []byte
+	sync.Mutex // write lock
 }
 
 // NewPacketConn wraps a net.PacketConn with stream cipher encryption/decryption.
 func NewPacketConn(c net.PacketConn, ciph Cipher) net.PacketConn {
-	return &packetConn{PacketConn: c, Cipher: ciph}
+	return &packetConn{PacketConn: c, Cipher: ciph, buf: make([]byte, 64*1024)}
 }
 
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	buf := make([]byte, c.IVSize()+len(b))
-	_, err := Pack(buf, b, c.Cipher)
+	c.Lock()
+	defer c.Unlock()
+	buf, err := Pack(c.buf, b, c.Cipher)
 	if err != nil {
 		return 0, err
 	}

@@ -56,7 +56,7 @@ func udpLocal(laddr, server, target string, ciph core.PacketConnCipher) {
 			}
 
 			pc = ciph.PacketConn(pc)
-			nm.Add(raddr, c, pc)
+			nm.Add(raddr, c, pc, false)
 		}
 
 		_, err = pc.WriteTo(buf[:len(tgt)+n], srvAddr)
@@ -109,7 +109,7 @@ func udpRemote(addr string, ciph core.PacketConnCipher) {
 				continue
 			}
 
-			nm.Add(raddr, c, pc)
+			nm.Add(raddr, c, pc, true)
 		}
 
 		_, err = pc.WriteTo(payload, tgtUDPAddr) // accept only UDPAddr despite the signature
@@ -159,29 +159,38 @@ func (m *natmap) Del(key string) net.PacketConn {
 	return nil
 }
 
-func (m *natmap) Add(peer net.Addr, dst, src net.PacketConn) {
+func (m *natmap) Add(peer net.Addr, dst, src net.PacketConn, srcIncluded bool) {
 	m.Set(peer.String(), src)
 
 	go func() {
-		timedCopy(dst, peer, src, m.timeout)
+		timedCopy(dst, peer, src, m.timeout, srcIncluded)
 		if pc := m.Del(peer.String()); pc != nil {
 			pc.Close()
 		}
 	}()
 }
 
-// copy from src to dst with addr with read timeout
-func timedCopy(dst net.PacketConn, addr net.Addr, src net.PacketConn, timeout time.Duration) error {
+// copy from src to dst at target with read timeout
+func timedCopy(dst net.PacketConn, target net.Addr, src net.PacketConn, timeout time.Duration, srcIncluded bool) error {
 	buf := make([]byte, udpBufSize)
 
 	for {
 		src.SetReadDeadline(time.Now().Add(timeout))
-		n, _, err := src.ReadFrom(buf)
+		n, raddr, err := src.ReadFrom(buf)
 		if err != nil {
 			return err
 		}
 
-		_, err = dst.WriteTo(buf[:n], addr)
+		if srcIncluded { // server -> client: add original packet source
+			srcAddr := socks.ParseAddr(raddr.String())
+			copy(buf[len(srcAddr):], buf[:n])
+			copy(buf, srcAddr)
+			_, err = dst.WriteTo(buf[:len(srcAddr)+n], target)
+		} else { // client -> user: strip original packet source
+			srcAddr := socks.SplitAddr(buf[:n])
+			_, err = dst.WriteTo(buf[len(srcAddr):n], target)
+		}
+
 		if err != nil {
 			return err
 		}

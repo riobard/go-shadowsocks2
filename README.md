@@ -22,24 +22,14 @@ go get -u -v github.com/riobard/go-shadowsocks2
 
 ## Basic Usage
 
-### Key generation
-
-A random key is almost always better than a password. You can generate a base64url-encoded 16-byte random key with
-
-```sh
-go-shadowsocks2 -keygen 16
-```
-
 
 ### Server
 
-Start a server listening on port 8848 using `aes-128-gcm` AEAD cipher with a base64url-encoded 16-byte key.
-
+Start a server listening on port 8488 using `aes-128-gcm` AEAD cipher with password `your-password`.
 
 ```sh
-go-shadowsocks2 -s :8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
+go-shadowsocks2 -s ss://aes-128-gcm:your-password@:8488 -verbose
 ```
-
 
 
 ### Client
@@ -49,13 +39,35 @@ connections, and tunnels UDP packets received on port 1080 and port 1081 to 8.8.
 respectively. 
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== \
+go-shadowsocks2 -c ss://aes-128-gcm:your-password@[server_address]:8488 \
     -socks :1080 -udptun :1080=8.8.8.8:53,:1081=8.8.4.4:53 -verbose
 ```
 
+Replace `[server_address]` with the server's public address.
 
 
 ## Advanced Usage
+
+
+### Use random keys instead of passwords
+
+A random key is almost always better than a password. Generate a base64url-encoded 16-byte random key
+
+```sh
+go-shadowsocks2 -keygen 16
+```
+
+Start a server listening on port 8848 using `aes-128-gcm` AEAD cipher with the key generated above.
+
+```sh
+go-shadowsocks2 -s :8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
+```
+
+And the corresponding client to connect to it.
+
+```sh
+go-shadowsocks2 -c [server_address]:8488 -cipher aes-128-gcm -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
+```
 
 
 ### Netfilter TCP redirect (Linux only)

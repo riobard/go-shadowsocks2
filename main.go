@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -48,8 +49,8 @@ func main() {
 	flag.StringVar(&flags.Key, "key", "", "base64url-encoded key (derive from password if empty)")
 	flag.IntVar(&flags.Keygen, "keygen", 0, "generate a base64url-encoded random key of given length in byte")
 	flag.StringVar(&flags.Password, "password", "", "password")
-	flag.StringVar(&flags.Server, "s", "", "server listen address")
-	flag.StringVar(&flags.Client, "c", "", "client connect address")
+	flag.StringVar(&flags.Server, "s", "", "server listen address or url")
+	flag.StringVar(&flags.Client, "c", "", "client connect address or url")
 	flag.StringVar(&flags.Socks, "socks", ":1080", "(client-only) SOCKS listen address")
 	flag.StringVar(&flags.RedirTCP, "redir", "", "(client-only) redirect TCP from this address")
 	flag.StringVar(&flags.RedirTCP6, "redir6", "", "(client-only) redirect TCP IPv6 from this address")
@@ -79,42 +80,81 @@ func main() {
 		key = k
 	}
 
-	ciph, err := core.PickCipher(flags.Cipher, key, flags.Password)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if flags.Client != "" { // client mode
+		addr := flags.Client
+		cipher := flags.Cipher
+		password := flags.Password
+
+		if strings.HasPrefix(addr, "ss://") {
+			u, err := url.Parse(addr)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			addr = u.Host
+			if u.User != nil {
+				cipher = u.User.Username()
+				password, _ = u.User.Password()
+			}
+		}
+
+		ciph, err := core.PickCipher(cipher, key, password)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		if flags.UDPTun != "" {
 			for _, tun := range strings.Split(flags.UDPTun, ",") {
 				p := strings.Split(tun, "=")
-				go udpLocal(p[0], flags.Client, p[1], ciph)
+				go udpLocal(p[0], addr, p[1], ciph)
 			}
 		}
 
 		if flags.TCPTun != "" {
 			for _, tun := range strings.Split(flags.TCPTun, ",") {
 				p := strings.Split(tun, "=")
-				go tcpTun(p[0], flags.Client, p[1], ciph)
+				go tcpTun(p[0], addr, p[1], ciph)
 			}
 		}
 
 		if flags.Socks != "" {
-			go socksLocal(flags.Socks, flags.Client, ciph)
+			go socksLocal(flags.Socks, addr, ciph)
 		}
 
 		if flags.RedirTCP != "" {
-			go redirLocal(flags.RedirTCP, flags.Client, ciph)
+			go redirLocal(flags.RedirTCP, addr, ciph)
 		}
 
 		if flags.RedirTCP6 != "" {
-			go redir6Local(flags.RedirTCP6, flags.Client, ciph)
+			go redir6Local(flags.RedirTCP6, addr, ciph)
 		}
 	}
 
 	if flags.Server != "" { // server mode
-		go udpRemote(flags.Server, ciph)
-		go tcpRemote(flags.Server, ciph)
+		addr := flags.Server
+		cipher := flags.Cipher
+		password := flags.Password
+
+		if strings.HasPrefix(addr, "ss://") {
+			u, err := url.Parse(addr)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			addr = u.Host
+			if u.User != nil {
+				cipher = u.User.Username()
+				password, _ = u.User.Password()
+			}
+		}
+
+		ciph, err := core.PickCipher(cipher, key, password)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go udpRemote(addr, ciph)
+		go tcpRemote(addr, ciph)
 	}
 
 	sigCh := make(chan os.Signal, 1)

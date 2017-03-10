@@ -32,10 +32,10 @@ var aeadList = map[string]struct {
 	KeySize int
 	New     func([]byte) (shadowaead.Cipher, error)
 }{
-	"aes-128-gcm":            {16, shadowaead.AESGCM},
-	"aes-192-gcm":            {24, shadowaead.AESGCM},
-	"aes-256-gcm":            {32, shadowaead.AESGCM},
-	"chacha20-ietf-poly1305": {32, shadowaead.Chacha20IETFPoly1305},
+	"AEAD_AES_128_GCM":       {16, shadowaead.AESGCM},
+	"AEAD_AES_192_GCM":       {24, shadowaead.AESGCM},
+	"AEAD_AES_256_GCM":       {32, shadowaead.AESGCM},
+	"AEAD_CHACHA20_POLY1305": {32, shadowaead.Chacha20Poly1305},
 }
 
 // List of stream ciphers: key size in bytes and constructor
@@ -43,13 +43,13 @@ var streamList = map[string]struct {
 	KeySize int
 	New     func(key []byte) (shadowstream.Cipher, error)
 }{
-	"aes-128-ctr":   {16, shadowstream.AESCTR},
-	"aes-192-ctr":   {24, shadowstream.AESCTR},
-	"aes-256-ctr":   {32, shadowstream.AESCTR},
-	"aes-128-cfb":   {16, shadowstream.AESCFB},
-	"aes-192-cfb":   {24, shadowstream.AESCFB},
-	"aes-256-cfb":   {32, shadowstream.AESCFB},
-	"chacha20-ietf": {32, shadowstream.Chacha20IETF},
+	"AES-128-CTR":   {16, shadowstream.AESCTR},
+	"AES-192-CTR":   {24, shadowstream.AESCTR},
+	"AES-256-CTR":   {32, shadowstream.AESCTR},
+	"AES-128-CFB":   {16, shadowstream.AESCFB},
+	"AES-192-CFB":   {24, shadowstream.AESCFB},
+	"AES-256-CFB":   {32, shadowstream.AESCFB},
+	"CHACHA20-IETF": {32, shadowstream.Chacha20IETF},
 }
 
 // ListCipher returns a list of available cipher names sorted alphabetically.
@@ -67,10 +67,19 @@ func ListCipher() []string {
 
 // PickCipher returns a Cipher of the given name. Derive key from password if given key is empty.
 func PickCipher(name string, key []byte, password string) (Cipher, error) {
-	name = strings.ToLower(name)
+	name = strings.ToUpper(name)
 
-	if name == "dummy" {
+	switch name {
+	case "DUMMY":
 		return &dummy{}, nil
+	case "CHACHA20-IETF-POLY1305":
+		name = "AEAD_CHACHA20_POLY1305"
+	case "AES-128-GCM":
+		name = "AEAD_AES_128_GCM"
+	case "AES-196-GCM":
+		name = "AEAD_AES_196_GCM"
+	case "AES-256-GCM":
+		name = "AEAD_AES_256_GCM"
 	}
 
 	if choice, ok := aeadList[name]; ok {

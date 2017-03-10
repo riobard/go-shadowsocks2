@@ -74,9 +74,9 @@ func AESGCM(psk []byte) (Cipher, error) {
 	return &metaCipher{psk: psk, makeAEAD: aesGCM}, nil
 }
 
-// Chacha20IETFPoly1305 creates a new Cipher with a pre-shared key. len(psk)
+// Chacha20Poly1305 creates a new Cipher with a pre-shared key. len(psk)
 // must be 32.
-func Chacha20IETFPoly1305(psk []byte) (Cipher, error) {
+func Chacha20Poly1305(psk []byte) (Cipher, error) {
 	if len(psk) != chacha20poly1305.KeySize {
 		return nil, KeySizeError(chacha20poly1305.KeySize)
 	}

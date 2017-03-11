@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"net"
+	"time"
 
 	"github.com/shadowsocks/go-shadowsocks2/core"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
@@ -69,8 +70,10 @@ func tcpLocalHandle(c net.Conn, server string, target socks.Addr, ciph core.Stre
 
 	_, _, err = relay(sc, c)
 	if err != nil {
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			return // ignore i/o timeout
+		}
 		logf("relay error: %v", err)
-		return
 	}
 }
 
@@ -112,14 +115,16 @@ func tcpRemoteHandle(c net.Conn) {
 
 	_, _, err = relay(c, conn)
 	if err != nil {
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			return // ignore i/o timeout
+		}
 		logf("relay error: %v", err)
-		return
 	}
 }
 
 // relay copies between left and right bidirectionally. Returns number of
 // bytes copied from right to left, from left to right, and any error occurred.
-func relay(left, right io.ReadWriter) (int64, int64, error) {
+func relay(left, right net.Conn) (int64, int64, error) {
 	type res struct {
 		N   int64
 		Err error
@@ -127,40 +132,19 @@ func relay(left, right io.ReadWriter) (int64, int64, error) {
 	ch := make(chan res)
 
 	go func() {
-		n, err := copyHalfClose(right, left)
+		n, err := io.Copy(right, left)
+		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
 		ch <- res{n, err}
 	}()
 
-	n, err := copyHalfClose(left, right)
+	n, err := io.Copy(left, right)
+	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
 	rs := <-ch
 
 	if err == nil {
 		err = rs.Err
 	}
 	return n, rs.N, err
-}
-
-type closeWriter interface {
-	CloseWrite() error
-}
-
-type closeReader interface {
-	CloseRead() error
-}
-
-// copyHalfClose copies to dst from src and optionally closes dst for writing and src for reading.
-func copyHalfClose(dst io.Writer, src io.Reader) (int64, error) {
-	defer func() {
-		// half-close to wake up other goroutines blocking on dst and src
-
-		if c, ok := dst.(closeWriter); ok {
-			c.CloseWrite()
-		}
-
-		if c, ok := src.(closeReader); ok {
-			c.CloseRead()
-		}
-	}()
-
-	return io.Copy(dst, src) // will use io.ReaderFrom or io.WriterTo shortcut if possible
 }

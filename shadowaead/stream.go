@@ -181,14 +181,6 @@ func increment(b []byte) {
 	}
 }
 
-type closeWriter interface {
-	CloseWrite() error
-}
-
-type closeReader interface {
-	CloseRead() error
-}
-
 type streamConn struct {
 	net.Conn
 	Cipher
@@ -262,20 +254,6 @@ func (c *streamConn) ReadFrom(r io.Reader) (int64, error) {
 		}
 	}
 	return c.w.ReadFrom(r)
-}
-
-func (c *streamConn) CloseRead() error {
-	if c, ok := c.Conn.(closeReader); ok {
-		return c.CloseRead()
-	}
-	return nil
-}
-
-func (c *streamConn) CloseWrite() error {
-	if c, ok := c.Conn.(closeWriter); ok {
-		return c.CloseWrite()
-	}
-	return nil
 }
 
 // NewConn wraps a stream-oriented net.Conn with cipher.

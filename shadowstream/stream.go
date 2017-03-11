@@ -169,25 +169,3 @@ func (c *conn) ReadFrom(r io.Reader) (int64, error) {
 	}
 	return c.w.ReadFrom(r)
 }
-
-type closeWriter interface {
-	CloseWrite() error
-}
-
-type closeReader interface {
-	CloseRead() error
-}
-
-func (c *conn) CloseRead() error {
-	if c, ok := c.Conn.(closeReader); ok {
-		return c.CloseRead()
-	}
-	return nil
-}
-
-func (c *conn) CloseWrite() error {
-	if c, ok := c.Conn.(closeWriter); ok {
-		return c.CloseWrite()
-	}
-	return nil
-}

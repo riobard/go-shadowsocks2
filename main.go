@@ -84,17 +84,12 @@ func main() {
 		addr := flags.Client
 		cipher := flags.Cipher
 		password := flags.Password
+		var err error
 
 		if strings.HasPrefix(addr, "ss://") {
-			u, err := url.Parse(addr)
+			addr, cipher, password, err = parseURL(addr)
 			if err != nil {
 				log.Fatal(err)
-			}
-
-			addr = u.Host
-			if u.User != nil {
-				cipher = u.User.Username()
-				password, _ = u.User.Password()
 			}
 		}
 
@@ -134,17 +129,12 @@ func main() {
 		addr := flags.Server
 		cipher := flags.Cipher
 		password := flags.Password
+		var err error
 
 		if strings.HasPrefix(addr, "ss://") {
-			u, err := url.Parse(addr)
+			addr, cipher, password, err = parseURL(addr)
 			if err != nil {
 				log.Fatal(err)
-			}
-
-			addr = u.Host
-			if u.User != nil {
-				cipher = u.User.Username()
-				password, _ = u.User.Password()
 			}
 		}
 
@@ -160,4 +150,18 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
+}
+
+func parseURL(s string) (addr, cipher, password string, err error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return
+	}
+
+	addr = u.Host
+	if u.User != nil {
+		cipher = u.User.Username()
+		password, _ = u.User.Password()
+	}
+	return
 }

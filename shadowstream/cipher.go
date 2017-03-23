@@ -70,3 +70,22 @@ func Chacha20IETF(key []byte) (Cipher, error) {
 	}
 	return chacha20ietfkey(key), nil
 }
+
+type xchacha20key []byte
+
+func (k xchacha20key) IVSize() int                       { return chacha20.XNonceSize }
+func (k xchacha20key) Decrypter(iv []byte) cipher.Stream { return k.Encrypter(iv) }
+func (k xchacha20key) Encrypter(iv []byte) cipher.Stream {
+	ciph, err := chacha20.NewCipher(k, iv)
+	if err != nil {
+		panic(err) // should never happen
+	}
+	return ciph
+}
+
+func Xchacha20(key []byte) (Cipher, error) {
+	if len(key) != chacha20.KeySize {
+		return nil, KeySizeError(chacha20.KeySize)
+	}
+	return xchacha20key(key), nil
+}

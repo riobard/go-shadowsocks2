@@ -50,6 +50,7 @@ var streamList = map[string]struct {
 	"AES-192-CFB":   {24, shadowstream.AESCFB},
 	"AES-256-CFB":   {32, shadowstream.AESCFB},
 	"CHACHA20-IETF": {32, shadowstream.Chacha20IETF},
+	"XCHACHA20":     {32, shadowstream.Xchacha20},
 }
 
 // ListCipher returns a list of available cipher names sorted alphabetically.

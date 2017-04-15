@@ -7,14 +7,13 @@ import (
 
 	"sync"
 
-	"github.com/riobard/go-shadowsocks2/core"
 	"github.com/riobard/go-shadowsocks2/socks"
 )
 
 const udpBufSize = 64 * 1024
 
 // Listen on laddr for UDP packets, encrypt and send to server to reach target.
-func udpLocal(laddr, server, target string, ciph core.PacketConnCipher) {
+func udpLocal(laddr, server, target string, shadow func(net.PacketConn) net.PacketConn) {
 	srvAddr, err := net.ResolveUDPAddr("udp", server)
 	if err != nil {
 		logf("UDP server address error: %v", err)
@@ -55,7 +54,7 @@ func udpLocal(laddr, server, target string, ciph core.PacketConnCipher) {
 				continue
 			}
 
-			pc = ciph.PacketConn(pc)
+			pc = shadow(pc)
 			nm.Add(raddr, c, pc, false)
 		}
 
@@ -68,13 +67,14 @@ func udpLocal(laddr, server, target string, ciph core.PacketConnCipher) {
 }
 
 // Listen on addr for encrypted packets and basically do UDP NAT.
-func udpRemote(addr string, ciph core.PacketConnCipher) {
-	c, err := core.ListenPacket("udp", addr, ciph)
+func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
+	c, err := net.ListenPacket("udp", addr)
 	if err != nil {
 		logf("UDP remote listen error: %v", err)
 		return
 	}
 	defer c.Close()
+	c = shadow(c)
 
 	nm := newNATmap(config.UDPTimeout)
 	buf := make([]byte, udpBufSize)

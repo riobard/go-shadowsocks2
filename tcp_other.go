@@ -2,12 +2,12 @@
 
 package main
 
-import "github.com/riobard/go-shadowsocks2/core"
+import "net"
 
-func redirLocal(addr, server string, ciph core.StreamConnCipher) {
+func redirLocal(addr, server string, shadow func(net.Conn) net.Conn) {
 	logf("TCP redirect not supported")
 }
 
-func redir6Local(addr, server string, ciph core.StreamConnCipher) {
+func redir6Local(addr, server string, shadow func(net.Conn) net.Conn) {
 	logf("TCP6 redirect not supported")
 }

@@ -130,22 +130,28 @@ func relay(left, right net.Conn) (int64, int64, error) {
 		N   int64
 		Err error
 	}
-	ch := make(chan res)
 
+	ch1 := make(chan res)
 	go func() {
-		n, err := io.Copy(right, left)
-		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-		ch <- res{n, err}
+		n1, err1 := io.Copy(left, right)
+		left.Close()
+		ch1 <- res{n1, err1}
 	}()
 
-	n, err := io.Copy(left, right)
-	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	rs := <-ch
+	ch2 := make(chan res)
+	go func() {
+		n2, err2 := io.Copy(right, left)
+		right.Close()
+		ch2 <- res{n2, err2}
+	}()
 
+	res1 := <-ch1
+	res2 := <-ch2
+
+	err := res1.Err
 	if err == nil {
-		err = rs.Err
+		err = res2.Err
 	}
-	return n, rs.N, err
+
+	return res1.N, res2.N, err
 }

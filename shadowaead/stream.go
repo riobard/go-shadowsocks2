@@ -148,6 +148,16 @@ func (r *reader) Read(b []byte) (int, error) {
 // there's no more data to write or when an error occurs. Return number of
 // bytes written to w and any error encountered.
 func (r *reader) WriteTo(w io.Writer) (n int64, err error) {
+	// write decrypted bytes left over from previous record
+	for len(r.leftover) > 0 {
+		nw, ew := w.Write(r.leftover)
+		r.leftover = r.leftover[nw:]
+		n += int64(nw)
+		if ew != nil {
+			return n, ew
+		}
+	}
+
 	for {
 		nr, er := r.read()
 		if nr > 0 {

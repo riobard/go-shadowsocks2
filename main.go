@@ -101,27 +101,27 @@ func main() {
 		if flags.UDPTun != "" {
 			for _, tun := range strings.Split(flags.UDPTun, ",") {
 				p := strings.Split(tun, "=")
-				go udpLocal(p[0], addr, p[1], ciph)
+				go udpLocal(p[0], addr, p[1], ciph.PacketConn)
 			}
 		}
 
 		if flags.TCPTun != "" {
 			for _, tun := range strings.Split(flags.TCPTun, ",") {
 				p := strings.Split(tun, "=")
-				go tcpTun(p[0], addr, p[1], ciph)
+				go tcpTun(p[0], addr, p[1], ciph.StreamConn)
 			}
 		}
 
 		if flags.Socks != "" {
-			go socksLocal(flags.Socks, addr, ciph)
+			go socksLocal(flags.Socks, addr, ciph.StreamConn)
 		}
 
 		if flags.RedirTCP != "" {
-			go redirLocal(flags.RedirTCP, addr, ciph)
+			go redirLocal(flags.RedirTCP, addr, ciph.StreamConn)
 		}
 
 		if flags.RedirTCP6 != "" {
-			go redir6Local(flags.RedirTCP6, addr, ciph)
+			go redir6Local(flags.RedirTCP6, addr, ciph.StreamConn)
 		}
 	}
 
@@ -143,8 +143,8 @@ func main() {
 			log.Fatal(err)
 		}
 
-		go udpRemote(addr, ciph)
-		go tcpRemote(addr, ciph)
+		go udpRemote(addr, ciph.PacketConn)
+		go tcpRemote(addr, ciph.StreamConn)
 	}
 
 	sigCh := make(chan os.Signal, 1)

@@ -2,7 +2,7 @@
 
 A fresh implementation of Shadowsocks in Go.
 
-GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
+GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
 
 ## Features
@@ -16,7 +16,7 @@ GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
 ## Install
 
 ```sh
-go get -u -v github.com/riobard/go-shadowsocks2
+go get -u -v github.com/shadowsocks/go-shadowsocks2
 ```
 
 

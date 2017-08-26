@@ -32,26 +32,23 @@ func getOrigDst(conn net.Conn, ipv6 bool) (socks.Addr, error) {
 	if !ok {
 		return nil, errors.New("only work with TCP connection")
 	}
-	f, err := c.File()
+
+	rc, err := c.SyscallConn()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	fd := f.Fd()
+	var addr socks.Addr
 
-	// The File() call above puts both the original socket fd and the file fd in blocking mode.
-	// Set the file fd back to non-blocking mode and the original socket fd will become non-blocking as well.
-	// Otherwise blocking I/O will waste OS threads.
-	if err := syscall.SetNonblock(int(fd), true); err != nil {
-		return nil, err
-	}
+	rc.Control(func(fd uintptr) {
+		if ipv6 {
+			addr, err = ipv6_getorigdst(fd)
+		} else {
+			addr, err = getorigdst(fd)
+		}
+	})
 
-	if ipv6 {
-		return ipv6_getorigdst(fd)
-	}
-
-	return getorigdst(fd)
+	return addr, err
 }
 
 // Call getorigdst() from linux/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c

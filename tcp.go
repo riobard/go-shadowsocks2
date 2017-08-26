@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/riobard/go-shadowsocks2/socks"
@@ -126,26 +127,25 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 // relay copies between left and right bidirectionally. Returns number of
 // bytes copied from right to left, from left to right, and any error occurred.
 func relay(left, right net.Conn) (int64, int64, error) {
-	type res struct {
-		N   int64
-		Err error
-	}
-	ch := make(chan res)
+	var nLR, nRL int64
+	var errLR, errRL error
+	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
-		n, err := io.Copy(right, left)
+		defer wg.Done()
+		nRL, errRL = io.Copy(right, left)
 		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
 		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-		ch <- res{n, err}
 	}()
 
-	n, err := io.Copy(left, right)
+	nLR, errLR = io.Copy(left, right)
 	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
 	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	rs := <-ch
+	wg.Wait()
 
-	if err == nil {
-		err = rs.Err
+	if errLR == nil {
+		errLR = errRL
 	}
-	return n, rs.N, err
+	return nLR, nRL, errLR
 }

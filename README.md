@@ -15,6 +15,8 @@ GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
 
 ## Install
 
+Requires Go >= 1.9.
+
 ```sh
 go get -u -v github.com/riobard/go-shadowsocks2
 ```

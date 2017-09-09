@@ -64,10 +64,13 @@ type packetConn struct {
 	buf []byte // write lock
 }
 
+const maxPacketSize = 64 * 1024
+
+var bufferPool = sync.Pool{New: func() interface{} { return make([]byte, maxPacketSize) }}
+
 // NewPacketConn wraps a net.PacketConn with cipher
 func NewPacketConn(c net.PacketConn, ciph Cipher) net.PacketConn {
-	const maxPacketSize = 64 * 1024
-	return &packetConn{PacketConn: c, Cipher: ciph, buf: make([]byte, maxPacketSize)}
+	return &packetConn{PacketConn: c, Cipher: ciph, buf: bufferPool.Get().([]byte)}
 }
 
 // WriteTo encrypts b and write to addr using the embedded PacketConn.
@@ -90,4 +93,9 @@ func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 	b, err = Unpack(b, b[:n], c)
 	return len(b), addr, err
+}
+
+func (c *packetConn) Close() error {
+	bufferPool.Put(c.buf)
+	return c.PacketConn.Close()
 }

@@ -10,24 +10,24 @@ import (
 )
 
 // Create a SOCKS server listening on addr and proxy to server.
-func socksLocal(addr, server string, shadow func(net.Conn) net.Conn) {
-	logf("SOCKS proxy %s <-> %s", addr, server)
-	tcpLocal(addr, server, shadow, func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) })
+func socksLocal(addr string, d Dialer) {
+	logf("SOCKS proxy %s", addr)
+	tcpLocal(addr, d, func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) })
 }
 
 // Create a TCP tunnel from addr to target via server.
-func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn) {
+func tcpTun(addr, target string, d Dialer) {
 	tgt := socks.ParseAddr(target)
 	if tgt == nil {
 		logf("invalid target address %q", target)
 		return
 	}
-	logf("TCP tunnel %s <-> %s <-> %s", addr, server, target)
-	tcpLocal(addr, server, shadow, func(net.Conn) (socks.Addr, error) { return tgt, nil })
+	logf("TCP tunnel %s <-> %s", addr, target)
+	tcpLocal(addr, d, func(net.Conn) (socks.Addr, error) { return tgt, nil })
 }
 
 // Listen on addr and proxy to server to reach target from getAddr.
-func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(net.Conn) (socks.Addr, error)) {
+func tcpLocal(addr string, d Dialer, getAddr func(net.Conn) (socks.Addr, error)) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
@@ -51,21 +51,13 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 
-			rc, err := net.Dial("tcp", server)
+			rc, err := d.Dial("tcp", tgt.String())
 			if err != nil {
-				logf("failed to connect to server %v: %v", server, err)
-				return
-			}
-			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
-			rc = shadow(rc)
-
-			if _, err = rc.Write(tgt); err != nil {
-				logf("failed to send target address: %v", err)
+				logf("failed to connect: %v", err)
 				return
 			}
 
-			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
+			logf("proxy %s <--[%s]--> %s", c.RemoteAddr(), rc.RemoteAddr(), tgt)
 			_, _, err = relay(rc, c)
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {

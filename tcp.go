@@ -43,7 +43,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 		go func() {
 			defer c.Close()
 			c.(*net.TCPConn).SetKeepAlive(true)
-
+			// TODO: keep the connection until disconnect then free the UDP socket
 			tgt, err := getAddr(c)
 			if err != nil {
 				logf("failed to get target address: %v", err)

@@ -7,7 +7,7 @@ GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
 ## Features
 
-- SOCKS5 proxy 
+- SOCKS5 proxy (Including UDP Associate)
 - Support for Netfilter TCP redirect (IPv6 should work but not tested)
 - UDP tunneling (e.g. relay DNS packets)
 - TCP tunneling (e.g. benchmark with iperf3)
@@ -40,8 +40,8 @@ respectively.
 
 ```sh
 go-shadowsocks2 -c ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488 \
-     -verbose -socks :1080 -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53 \
-                           -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
+     -verbose -socks :1080 -u -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53 \
+                              -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
 ```
 
 Replace `[server_address]` with the server's public address.

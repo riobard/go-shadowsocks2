@@ -41,6 +41,7 @@ const (
 	ErrTTLExpired           = Error(6)
 	ErrCommandNotSupported  = Error(7)
 	ErrAddressNotSupported  = Error(8)
+	InfoUDPAssociate        = Error(9)
 )
 
 // MaxAddrLen is the maximum size of SOCKS address in bytes.
@@ -184,7 +185,6 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 		return nil, err
 	}
 	buf = buf[:n]
-	// TODO: when disconnected, release the natmap
 	switch buf[1] {
 	case CmdConnect:
 		_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
@@ -194,6 +194,10 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 		}
 		addr := ParseAddr(rw.(net.Conn).LocalAddr().String())
 		_, err = rw.Write(append([]byte{5, 0, 0}, addr...)) // SOCKS v5, reply succeeded
+		if err != nil {
+			return nil, ErrCommandNotSupported
+		}
+		err = InfoUDPAssociate
 	default:
 		return nil, ErrCommandNotSupported
 	}

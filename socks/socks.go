@@ -7,6 +7,9 @@ import (
 	"strconv"
 )
 
+// UDPEnabled is the toggle for UDP support
+var UDPEnabled = false
+
 // SOCKS request commands as defined in RFC 1928 section 4.
 const (
 	CmdConnect      = 1
@@ -181,11 +184,19 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 		return nil, err
 	}
 	buf = buf[:n]
-
-	if buf[1] != CmdConnect {
+	// TODO: when disconnected, release the natmap
+	switch buf[1] {
+	case CmdConnect:
+		_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
+	case CmdUDPAssociate:
+		if !UDPEnabled {
+			return nil, ErrCommandNotSupported
+		}
+		addr := ParseAddr(rw.(net.Conn).LocalAddr().String())
+		_, err = rw.Write(append([]byte{5, 0, 0}, addr...)) // SOCKS v5, reply succeeded
+	default:
 		return nil, ErrCommandNotSupported
 	}
 
-	_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
-	return buf[3:], err                                     // skip VER, CMD, RSV fields
+	return buf[3:], err // skip VER, CMD, RSV fields
 }

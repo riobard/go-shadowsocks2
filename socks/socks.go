@@ -188,11 +188,12 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 	if _, err := io.ReadFull(rw, buf[:3]); err != nil {
 		return nil, err
 	}
+	buf1 := buf[1]
 	addr, err := readAddr(rw, buf)
 	if err != nil {
 		return nil, err
 	}
-	switch buf[1] {
+	switch buf1 {
 	case CmdConnect:
 		_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
 	case CmdUDPAssociate:

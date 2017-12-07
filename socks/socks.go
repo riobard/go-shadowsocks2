@@ -7,6 +7,9 @@ import (
 	"strconv"
 )
 
+// UDPEnabled is the toggle for UDP support
+var UDPEnabled = false
+
 // SOCKS request commands as defined in RFC 1928 section 4.
 const (
 	CmdConnect      = 1
@@ -38,13 +41,11 @@ const (
 	ErrTTLExpired           = Error(6)
 	ErrCommandNotSupported  = Error(7)
 	ErrAddressNotSupported  = Error(8)
+	InfoUDPAssociate        = Error(9)
 )
 
 // MaxAddrLen is the maximum size of SOCKS address in bytes.
 const MaxAddrLen = 1 + 1 + 255 + 2
-
-// MaxReqLen is the maximum size of SOCKS request in bytes.
-const MaxReqLen = 1 + 1 + 1 + MaxAddrLen
 
 // Addr represents a SOCKS address as defined in RFC 1928 section 5.
 type Addr []byte
@@ -55,8 +56,8 @@ func (a Addr) String() string {
 
 	switch a[0] { // address type
 	case AtypDomainName:
-		host = string(a[2 : 2+a[1]])
-		port = strconv.Itoa((int(a[2+a[1]]) << 8) | int(a[2+a[1]+1]))
+		host = string(a[2 : 2+int(a[1])])
+		port = strconv.Itoa((int(a[2+int(a[1])]) << 8) | int(a[2+int(a[1])+1]))
 	case AtypIPv4:
 		host = net.IP(a[1 : 1+net.IPv4len]).String()
 		port = strconv.Itoa((int(a[1+net.IPv4len]) << 8) | int(a[1+net.IPv4len+1]))
@@ -68,9 +69,10 @@ func (a Addr) String() string {
 	return net.JoinHostPort(host, port)
 }
 
-// ReadAddr reads just enough bytes from r to get a valid Addr.
-func ReadAddr(r io.Reader) (Addr, error) {
-	b := make([]byte, MaxAddrLen)
+func readAddr(r io.Reader, b []byte) (Addr, error) {
+	if len(b) < MaxAddrLen {
+		return nil, io.ErrShortBuffer
+	}
 	_, err := io.ReadFull(r, b[:1]) // read 1st byte for address type
 	if err != nil {
 		return nil, err
@@ -82,8 +84,8 @@ func ReadAddr(r io.Reader) (Addr, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = io.ReadFull(r, b[2:2+b[1]+2])
-		return b[:1+1+b[1]+2], err
+		_, err = io.ReadFull(r, b[2:2+int(b[1])+2])
+		return b[:1+1+int(b[1])+2], err
 	case AtypIPv4:
 		_, err = io.ReadFull(r, b[1:1+net.IPv4len+2])
 		return b[:1+net.IPv4len+2], err
@@ -93,6 +95,11 @@ func ReadAddr(r io.Reader) (Addr, error) {
 	}
 
 	return nil, ErrAddressNotSupported
+}
+
+// ReadAddr reads just enough bytes from r to get a valid Addr.
+func ReadAddr(r io.Reader) (Addr, error) {
+	return readAddr(r, make([]byte, MaxAddrLen))
 }
 
 // SplitAddr slices a SOCKS address from beginning of b. Returns nil if failed.
@@ -163,29 +170,45 @@ func ParseAddr(s string) Addr {
 
 // Handshake fast-tracks SOCKS initialization to get target address to connect.
 func Handshake(rw io.ReadWriter) (Addr, error) {
-	// Read RFC 1928 section 4 for request and reply structure and sizes
-	buf := make([]byte, MaxReqLen)
-
-	_, err := rw.Read(buf) // SOCKS version and auth methods
+	// Read RFC 1928 for request and reply structure and sizes.
+	buf := make([]byte, MaxAddrLen)
+	// read VER, NMETHODS, METHODS
+	if _, err := io.ReadFull(rw, buf[:2]); err != nil {
+		return nil, err
+	}
+	nmethods := buf[1]
+	if _, err := io.ReadFull(rw, buf[:nmethods]); err != nil {
+		return nil, err
+	}
+	// write VER METHOD
+	if _, err := rw.Write([]byte{5, 0}); err != nil {
+		return nil, err
+	}
+	// read VER CMD RSV ATYP DST.ADDR DST.PORT
+	if _, err := io.ReadFull(rw, buf[:3]); err != nil {
+		return nil, err
+	}
+	cmd := buf[1]
+	addr, err := readAddr(rw, buf)
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = rw.Write([]byte{5, 0}) // SOCKS v5, no auth required
-	if err != nil {
-		return nil, err
-	}
-
-	n, err := rw.Read(buf) // SOCKS request: VER, CMD, RSV, Addr
-	if err != nil {
-		return nil, err
-	}
-	buf = buf[:n]
-
-	if buf[1] != CmdConnect {
+	switch cmd {
+	case CmdConnect:
+		_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
+	case CmdUDPAssociate:
+		if !UDPEnabled {
+			return nil, ErrCommandNotSupported
+		}
+		listenAddr := ParseAddr(rw.(net.Conn).LocalAddr().String())
+		_, err = rw.Write(append([]byte{5, 0, 0}, listenAddr...)) // SOCKS v5, reply succeeded
+		if err != nil {
+			return nil, ErrCommandNotSupported
+		}
+		err = InfoUDPAssociate
+	default:
 		return nil, ErrCommandNotSupported
 	}
 
-	_, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
-	return buf[3:], err                                     // skip VER, CMD, RSV fields
+	return addr, err // skip VER, CMD, RSV fields
 }

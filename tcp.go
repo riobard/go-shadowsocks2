@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/riobard/go-shadowsocks2/socks"
+	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
 // Create a SOCKS server listening on addr and proxy to server.
@@ -43,9 +43,23 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 		go func() {
 			defer c.Close()
 			c.(*net.TCPConn).SetKeepAlive(true)
-
 			tgt, err := getAddr(c)
 			if err != nil {
+
+				// UDP: keep the connection until disconnect then free the UDP socket
+				if err == socks.InfoUDPAssociate {
+					buf := []byte{}
+					// block here
+					for {
+						_, err := c.Read(buf)
+						if err, ok := err.(net.Error); ok && err.Timeout() {
+							continue
+						}
+						logf("UDP Associate End.")
+						return
+					}
+				}
+
 				logf("failed to get target address: %v", err)
 				return
 			}

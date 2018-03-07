@@ -9,6 +9,13 @@ import (
 	"github.com/riobard/go-shadowsocks2/socks"
 )
 
+func tcpKeepAlive(c net.Conn) {
+	if tcp, ok := c.(*net.TCPConn); ok {
+		tcp.SetKeepAlive(true)
+		tcp.SetKeepAlivePeriod(3 * time.Minute)
+	}
+}
+
 // Create a SOCKS server listening on addr and proxy to server.
 func socksLocal(addr string, d Dialer) {
 	logf("SOCKS proxy %s", addr)
@@ -43,7 +50,7 @@ func tcpLocal(addr string, d Dialer, getAddr func(net.Conn) (socks.Addr, error))
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
+			tcpKeepAlive(c)
 
 			tgt, err := getAddr(c)
 			if err != nil {
@@ -56,10 +63,11 @@ func tcpLocal(addr string, d Dialer, getAddr func(net.Conn) (socks.Addr, error))
 				logf("failed to connect: %v", err)
 				return
 			}
+			defer rc.Close()
+			tcpKeepAlive(rc)
 
 			logf("proxy %s <--[%s]--> %s", c.RemoteAddr(), rc.RemoteAddr(), tgt)
-			_, _, err = relay(rc, c)
-			if err != nil {
+			if err = relay(rc, c); err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					return // ignore i/o timeout
 				}
@@ -87,7 +95,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
+			tcpKeepAlive(c)
 			c = shadow(c)
 
 			tgt, err := socks.ReadAddr(c)
@@ -102,11 +110,10 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 				return
 			}
 			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
+			tcpKeepAlive(rc)
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
-			_, _, err = relay(c, rc)
-			if err != nil {
+			if err = relay(c, rc); err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					return // ignore i/o timeout
 				}
@@ -116,28 +123,24 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 	}
 }
 
-// relay copies between left and right bidirectionally. Returns number of
-// bytes copied from right to left, from left to right, and any error occurred.
-func relay(left, right net.Conn) (int64, int64, error) {
-	var nLR, nRL int64
-	var errLR, errRL error
+// relay copies between left and right bidirectionally. Returns any error occurred.
+func relay(left, right net.Conn) error {
+	var err, err1 error
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		nRL, errRL = io.Copy(right, left)
-		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+		_, err1 = io.Copy(right, left)
+		right.SetReadDeadline(time.Now()) // unblock read on right
 	}()
 
-	nLR, errLR = io.Copy(left, right)
-	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+	_, err = io.Copy(left, right)
+	left.SetReadDeadline(time.Now()) // unblock read on left
 	wg.Wait()
 
-	if errLR == nil {
-		errLR = errRL
+	if err1 != nil {
+		err = err1
 	}
-	return nLR, nRL, errLR
+	return err
 }

@@ -74,7 +74,7 @@ func main() {
 			}
 		}
 
-		d, err := NewPriorityDialer(flags.Client...)
+		d, err := fastdialer(flags.Client...)
 		if err != nil {
 			log.Fatalf("failed to create dialer: %v", err)
 		}

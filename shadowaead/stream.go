@@ -1,184 +1,182 @@
 package shadowaead
 
 import (
-	"bytes"
 	"crypto/cipher"
 	"crypto/rand"
 	"io"
 	"net"
+	"sync"
 )
 
-// payloadSizeMask is the maximum size of payload in bytes.
-const payloadSizeMask = 0x3FFF // 16*1024 - 1
+const (
+	// payloadSizeMask is the maximum size of payload in bytes.
+	payloadSizeMask = 0x3FFF    // 16*1024 - 1
+	bufSize         = 17 * 1024 // >= 2+aead.Overhead()+payloadSizeMask+aead.Overhead()
+)
 
-type writer struct {
+var bufPool = sync.Pool{New: func() interface{} { return make([]byte, bufSize) }}
+
+type Writer struct {
 	io.Writer
 	cipher.AEAD
-	nonce []byte
-	buf   []byte
+	nonce [32]byte // should be sufficient for most nonce sizes
 }
 
-// NewWriter wraps an io.Writer with AEAD encryption.
-func NewWriter(w io.Writer, aead cipher.AEAD) io.Writer { return newWriter(w, aead) }
+// NewWriter wraps an io.Writer with authenticated encryption.
+func NewWriter(w io.Writer, aead cipher.AEAD) *Writer { return &Writer{Writer: w, AEAD: aead} }
 
-func newWriter(w io.Writer, aead cipher.AEAD) *writer {
-	return &writer{
-		Writer: w,
-		AEAD:   aead,
-		buf:    make([]byte, 2+aead.Overhead()+payloadSizeMask+aead.Overhead()),
-		nonce:  make([]byte, aead.NonceSize()),
+// Write encrypts p and writes to the embedded io.Writer.
+func (w *Writer) Write(p []byte) (n int, err error) {
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+	nonce := w.nonce[:w.NonceSize()]
+	tag := w.Overhead()
+	off := 2 + tag
+	for nr := 0; n < len(p) && err == nil; n += nr {
+		nr = payloadSizeMask
+		if n+nr > len(p) {
+			nr = len(p) - n
+		}
+		buf = buf[:off+nr+tag]
+		buf[0], buf[1] = byte(nr>>8), byte(nr) // big-endian payload size
+		w.Seal(buf[:0], nonce, buf[:2], nil)
+		increment(nonce)
+		w.Seal(buf[:off], nonce, p[:nr], nil)
+		increment(nonce)
+		_, err = w.Writer.Write(buf)
 	}
-}
-
-// Write encrypts b and writes to the embedded io.Writer.
-func (w *writer) Write(b []byte) (int, error) {
-	n, err := w.ReadFrom(bytes.NewBuffer(b))
-	return int(n), err
+	return
 }
 
 // ReadFrom reads from the given io.Reader until EOF or error, encrypts and
 // writes to the embedded io.Writer. Returns number of bytes read from r and
 // any error encountered.
-func (w *writer) ReadFrom(r io.Reader) (n int64, err error) {
+func (w *Writer) ReadFrom(r io.Reader) (n int64, err error) {
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+	nonce := w.nonce[:w.NonceSize()]
+	tag := w.Overhead()
+	off := 2 + tag
 	for {
-		buf := w.buf
-		payloadBuf := buf[2+w.Overhead() : 2+w.Overhead()+payloadSizeMask]
-		nr, er := r.Read(payloadBuf)
-
-		if nr > 0 {
-			n += int64(nr)
-			buf = buf[:2+w.Overhead()+nr+w.Overhead()]
-			payloadBuf = payloadBuf[:nr]
-			buf[0], buf[1] = byte(nr>>8), byte(nr) // big-endian payload size
-			w.Seal(buf[:0], w.nonce, buf[:2], nil)
-			increment(w.nonce)
-
-			w.Seal(payloadBuf[:0], w.nonce, payloadBuf, nil)
-			increment(w.nonce)
-
-			_, ew := w.Writer.Write(buf)
-			if ew != nil {
-				err = ew
-				break
-			}
+		nr, er := r.Read(buf[off : off+payloadSizeMask])
+		n += int64(nr)
+		buf[0], buf[1] = byte(nr>>8), byte(nr)
+		w.Seal(buf[:0], nonce, buf[:2], nil)
+		increment(nonce)
+		w.Seal(buf[:off], nonce, buf[off:off+nr], nil)
+		increment(nonce)
+		if _, ew := w.Writer.Write(buf[:off+nr+tag]); ew != nil {
+			err = ew
+			return
 		}
-
 		if er != nil {
 			if er != io.EOF { // ignore EOF as per io.ReaderFrom contract
 				err = er
 			}
-			break
+			return
 		}
 	}
-
-	return n, err
 }
 
-type reader struct {
+type Reader struct {
 	io.Reader
 	cipher.AEAD
-	nonce    []byte
-	buf      []byte
-	leftover []byte
+	nonce [32]byte // should be sufficient for most nonce sizes
+	buf   []byte   // to be put back into bufPool
+	off   int      // offset to unconsumed part of buf
 }
 
-// NewReader wraps an io.Reader with AEAD decryption.
-func NewReader(r io.Reader, aead cipher.AEAD) io.Reader { return newReader(r, aead) }
+// NewReader wraps an io.Reader with authenticated decryption.
+func NewReader(r io.Reader, aead cipher.AEAD) *Reader { return &Reader{Reader: r, AEAD: aead} }
 
-func newReader(r io.Reader, aead cipher.AEAD) *reader {
-	return &reader{
-		Reader: r,
-		AEAD:   aead,
-		buf:    make([]byte, payloadSizeMask+aead.Overhead()),
-		nonce:  make([]byte, aead.NonceSize()),
-	}
-}
+// Read and decrypt a record into p. len(p) >= max payload size + AEAD overhead.
+func (r *Reader) read(p []byte) (int, error) {
+	nonce := r.nonce[:r.NonceSize()]
+	tag := r.Overhead()
 
-// read and decrypt a record into the internal buffer. Return decrypted payload length and any error encountered.
-func (r *reader) read() (int, error) {
 	// decrypt payload size
-	buf := r.buf[:2+r.Overhead()]
-	_, err := io.ReadFull(r.Reader, buf)
+	p = p[:2+tag]
+	if _, err := io.ReadFull(r.Reader, p); err != nil {
+		return 0, err
+	}
+	_, err := r.Open(p[:0], nonce, p, nil)
+	increment(nonce)
 	if err != nil {
 		return 0, err
 	}
-
-	_, err = r.Open(buf[:0], r.nonce, buf, nil)
-	increment(r.nonce)
-	if err != nil {
-		return 0, err
-	}
-
-	size := (int(buf[0])<<8 + int(buf[1])) & payloadSizeMask
 
 	// decrypt payload
-	buf = r.buf[:size+r.Overhead()]
-	_, err = io.ReadFull(r.Reader, buf)
+	size := (int(p[0])<<8 + int(p[1])) & payloadSizeMask
+	p = p[:size+tag]
+	if _, err := io.ReadFull(r.Reader, p); err != nil {
+		return 0, err
+	}
+	_, err = r.Open(p[:0], nonce, p, nil)
+	increment(nonce)
 	if err != nil {
 		return 0, err
 	}
-
-	_, err = r.Open(buf[:0], r.nonce, buf, nil)
-	increment(r.nonce)
-	if err != nil {
-		return 0, err
-	}
-
 	return size, nil
 }
 
-// Read reads from the embedded io.Reader, decrypts and writes to b.
-func (r *reader) Read(b []byte) (int, error) {
-	// copy decrypted bytes (if any) from previous record first
-	if len(r.leftover) > 0 {
-		n := copy(b, r.leftover)
-		r.leftover = r.leftover[n:]
-		return n, nil
+// Read reads from the embedded io.Reader, decrypts and writes to p.
+func (r *Reader) Read(p []byte) (int, error) {
+	if r.buf == nil {
+		if len(p) >= payloadSizeMask+r.Overhead() {
+			return r.read(p)
+		}
+		b := bufPool.Get().([]byte)
+		n, err := r.read(b)
+		if err != nil {
+			return 0, err
+		}
+		r.buf = b[:n]
+		r.off = 0
 	}
 
-	n, err := r.read()
-	m := copy(b, r.buf[:n])
-	if m < n { // insufficient len(b), keep leftover for next read
-		r.leftover = r.buf[m:n]
+	n := copy(p, r.buf[r.off:])
+	r.off += n
+	if r.off == len(r.buf) {
+		bufPool.Put(r.buf[:cap(r.buf)])
+		r.buf = nil
 	}
-	return m, err
+	return n, nil
 }
 
 // WriteTo reads from the embedded io.Reader, decrypts and writes to w until
 // there's no more data to write or when an error occurs. Return number of
 // bytes written to w and any error encountered.
-func (r *reader) WriteTo(w io.Writer) (n int64, err error) {
-	// write decrypted bytes left over from previous record
-	for len(r.leftover) > 0 {
-		nw, ew := w.Write(r.leftover)
-		r.leftover = r.leftover[nw:]
-		n += int64(nw)
-		if ew != nil {
-			return n, ew
-		}
+func (r *Reader) WriteTo(w io.Writer) (n int64, err error) {
+	if r.buf == nil {
+		r.buf = bufPool.Get().([]byte)
+		r.off = len(r.buf)
 	}
 
 	for {
-		nr, er := r.read()
-		if nr > 0 {
-			nw, ew := w.Write(r.buf[:nr])
+		for r.off < len(r.buf) {
+			nw, ew := w.Write(r.buf[r.off:])
+			r.off += nw
 			n += int64(nw)
-
 			if ew != nil {
+				if r.off == len(r.buf) {
+					bufPool.Put(r.buf[:cap(r.buf)])
+					r.buf = nil
+				}
 				err = ew
-				break
+				return
 			}
 		}
 
+		nr, er := r.read(r.buf)
 		if er != nil {
-			if er != io.EOF { // ignore EOF as per io.Copy contract (using src.WriteTo shortcut)
+			if er != io.EOF {
 				err = er
 			}
-			break
+			return
 		}
+		r.buf = r.buf[:nr]
+		r.off = 0
 	}
-
-	return n, err
 }
 
 // increment little-endian encoded unsigned integer b. Wrap around on overflow.
@@ -191,14 +189,17 @@ func increment(b []byte) {
 	}
 }
 
-type streamConn struct {
+type Conn struct {
 	net.Conn
 	Cipher
-	r *reader
-	w *writer
+	r *Reader
+	w *Writer
 }
 
-func (c *streamConn) initReader() error {
+// NewConn wraps a stream-oriented net.Conn with cipher.
+func NewConn(c net.Conn, ciph Cipher) *Conn { return &Conn{Conn: c, Cipher: ciph} }
+
+func (c *Conn) initReader() error {
 	salt := make([]byte, c.SaltSize())
 	if _, err := io.ReadFull(c.Conn, salt); err != nil {
 		return err
@@ -209,11 +210,11 @@ func (c *streamConn) initReader() error {
 		return err
 	}
 
-	c.r = newReader(c.Conn, aead)
+	c.r = NewReader(c.Conn, aead)
 	return nil
 }
 
-func (c *streamConn) Read(b []byte) (int, error) {
+func (c *Conn) Read(b []byte) (int, error) {
 	if c.r == nil {
 		if err := c.initReader(); err != nil {
 			return 0, err
@@ -222,7 +223,7 @@ func (c *streamConn) Read(b []byte) (int, error) {
 	return c.r.Read(b)
 }
 
-func (c *streamConn) WriteTo(w io.Writer) (int64, error) {
+func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 	if c.r == nil {
 		if err := c.initReader(); err != nil {
 			return 0, err
@@ -231,7 +232,7 @@ func (c *streamConn) WriteTo(w io.Writer) (int64, error) {
 	return c.r.WriteTo(w)
 }
 
-func (c *streamConn) initWriter() error {
+func (c *Conn) initWriter() error {
 	salt := make([]byte, c.SaltSize())
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return err
@@ -244,11 +245,11 @@ func (c *streamConn) initWriter() error {
 	if err != nil {
 		return err
 	}
-	c.w = newWriter(c.Conn, aead)
+	c.w = NewWriter(c.Conn, aead)
 	return nil
 }
 
-func (c *streamConn) Write(b []byte) (int, error) {
+func (c *Conn) Write(b []byte) (int, error) {
 	if c.w == nil {
 		if err := c.initWriter(); err != nil {
 			return 0, err
@@ -257,7 +258,7 @@ func (c *streamConn) Write(b []byte) (int, error) {
 	return c.w.Write(b)
 }
 
-func (c *streamConn) ReadFrom(r io.Reader) (int64, error) {
+func (c *Conn) ReadFrom(r io.Reader) (int64, error) {
 	if c.w == nil {
 		if err := c.initWriter(); err != nil {
 			return 0, err
@@ -265,6 +266,3 @@ func (c *streamConn) ReadFrom(r io.Reader) (int64, error) {
 	}
 	return c.w.ReadFrom(r)
 }
-
-// NewConn wraps a stream-oriented net.Conn with cipher.
-func NewConn(c net.Conn, ciph Cipher) net.Conn { return &streamConn{Conn: c, Cipher: ciph} }

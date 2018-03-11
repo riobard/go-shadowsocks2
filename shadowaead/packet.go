@@ -22,12 +22,10 @@ func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return nil, err
 	}
-
 	aead, err := ciph.Encrypter(salt)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(dst) < saltSize+len(plaintext)+aead.Overhead() {
 		return nil, io.ErrShortBuffer
 	}
@@ -57,11 +55,9 @@ func Unpack(dst, pkt []byte, ciph Cipher) ([]byte, error) {
 	return b, err
 }
 
-type packetConn struct {
+type PacketConn struct {
 	net.PacketConn
 	Cipher
-	sync.Mutex
-	buf []byte // write lock
 }
 
 const maxPacketSize = 64 * 1024
@@ -69,15 +65,15 @@ const maxPacketSize = 64 * 1024
 var bufferPool = sync.Pool{New: func() interface{} { return make([]byte, maxPacketSize) }}
 
 // NewPacketConn wraps a net.PacketConn with cipher
-func NewPacketConn(c net.PacketConn, ciph Cipher) net.PacketConn {
-	return &packetConn{PacketConn: c, Cipher: ciph, buf: bufferPool.Get().([]byte)}
+func NewPacketConn(c net.PacketConn, ciph Cipher) *PacketConn {
+	return &PacketConn{PacketConn: c, Cipher: ciph}
 }
 
 // WriteTo encrypts b and write to addr using the embedded PacketConn.
-func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	c.Lock()
-	defer c.Unlock()
-	buf, err := Pack(c.buf, b, c)
+func (c *PacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	buf := bufferPool.Get().([]byte)
+	defer bufferPool.Put(buf)
+	buf, err := Pack(buf, b, c)
 	if err != nil {
 		return 0, err
 	}
@@ -86,16 +82,11 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 }
 
 // ReadFrom reads from the embedded PacketConn and decrypts into b.
-func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
+func (c *PacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, addr, err := c.PacketConn.ReadFrom(b)
 	if err != nil {
 		return n, addr, err
 	}
 	b, err = Unpack(b, b[:n], c)
 	return len(b), addr, err
-}
-
-func (c *packetConn) Close() error {
-	bufferPool.Put(c.buf)
-	return c.PacketConn.Close()
 }

@@ -170,9 +170,12 @@ func (m *natmap) Add(peer net.Addr, dst, src net.PacketConn, srcIncluded bool) {
 	}()
 }
 
+var bufferPool = sync.Pool{New: func() interface{} { return make([]byte, udpBufSize) }}
+
 // copy from src to dst at target with read timeout
 func timedCopy(dst net.PacketConn, target net.Addr, src net.PacketConn, timeout time.Duration, srcIncluded bool) error {
-	buf := make([]byte, udpBufSize)
+	buf := bufferPool.Get().([]byte)
+	defer bufferPool.Put(buf)
 
 	for {
 		src.SetReadDeadline(time.Now().Add(timeout))

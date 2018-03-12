@@ -23,7 +23,6 @@ func Pack(dst, plaintext []byte, s Cipher) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	s.Encrypter(iv).XORKeyStream(dst[len(iv):], plaintext)
 	return dst[:len(iv)+len(plaintext)], nil
 }
@@ -34,7 +33,6 @@ func Unpack(dst, pkt []byte, s Cipher) ([]byte, error) {
 	if len(pkt) < s.IVSize() {
 		return nil, ErrShortPacket
 	}
-
 	if len(dst) < len(pkt)-s.IVSize() {
 		return nil, io.ErrShortBuffer
 	}
@@ -43,22 +41,24 @@ func Unpack(dst, pkt []byte, s Cipher) ([]byte, error) {
 	return dst[:len(pkt)-len(iv)], nil
 }
 
-type packetConn struct {
+type PacketConn struct {
 	net.PacketConn
 	Cipher
-	buf        []byte
-	sync.Mutex // write lock
 }
 
 // NewPacketConn wraps a net.PacketConn with stream cipher encryption/decryption.
-func NewPacketConn(c net.PacketConn, ciph Cipher) net.PacketConn {
-	return &packetConn{PacketConn: c, Cipher: ciph, buf: make([]byte, 64*1024)}
+func NewPacketConn(c net.PacketConn, ciph Cipher) *PacketConn {
+	return &PacketConn{PacketConn: c, Cipher: ciph}
 }
 
-func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	c.Lock()
-	defer c.Unlock()
-	buf, err := Pack(c.buf, b, c.Cipher)
+const maxPacketSize = 64 * 1024
+
+var bufPool = sync.Pool{New: func() interface{} { return make([]byte, maxPacketSize) }}
+
+func (c *PacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+	buf, err := Pack(buf, b, c.Cipher)
 	if err != nil {
 		return 0, err
 	}
@@ -66,7 +66,7 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	return len(b), err
 }
 
-func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
+func (c *PacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, addr, err := c.PacketConn.ReadFrom(b)
 	if err != nil {
 		return n, addr, err

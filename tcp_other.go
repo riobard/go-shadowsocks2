@@ -2,12 +2,10 @@
 
 package main
 
-import "net"
-
-func redirLocal(addr, server string, shadow func(net.Conn) net.Conn) {
+func redirLocal(addr string, d Dialer) {
 	logf("TCP redirect not supported")
 }
 
-func redir6Local(addr, server string, shadow func(net.Conn) net.Conn) {
+func redir6Local(addr string, d Dialer) {
 	logf("TCP6 redirect not supported")
 }

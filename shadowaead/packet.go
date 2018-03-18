@@ -19,7 +19,7 @@ var _zerononce [128]byte // read-only. 128 bytes is more than enough.
 func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	saltSize := ciph.SaltSize()
 	salt := dst[:saltSize]
-	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+	if _, err := rand.Read(salt); err != nil {
 		return nil, err
 	}
 	aead, err := ciph.Encrypter(salt)

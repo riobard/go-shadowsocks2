@@ -234,7 +234,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 
 func (c *Conn) initWriter() error {
 	salt := make([]byte, c.SaltSize())
-	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+	if _, err := rand.Read(salt); err != nil {
 		return err
 	}
 	aead, err := c.Encrypter(salt)

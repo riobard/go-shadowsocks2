@@ -133,7 +133,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 func (c *Conn) initWriter() error {
 	if c.w == nil {
 		iv := make([]byte, c.IVSize())
-		if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		if _, err := rand.Read(iv); err != nil {
 			return err
 		}
 		if _, err := c.Conn.Write(iv); err != nil {

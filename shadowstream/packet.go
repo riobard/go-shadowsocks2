@@ -19,7 +19,7 @@ func Pack(dst, plaintext []byte, s Cipher) ([]byte, error) {
 		return nil, io.ErrShortBuffer
 	}
 	iv := dst[:s.IVSize()]
-	_, err := io.ReadFull(rand.Reader, iv)
+	_, err := rand.Read(iv)
 	if err != nil {
 		return nil, err
 	}

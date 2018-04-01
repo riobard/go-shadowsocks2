@@ -3,7 +3,7 @@ sudo: false
 go:
   - 1.x
 install: go get -u -t -v ./...
-script: make all
+script: make releases
 deploy:
   provider: releases
   api_key:

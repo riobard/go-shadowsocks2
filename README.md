@@ -15,11 +15,15 @@ GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/
 
 ## Install
 
-Requires Go >= 1.9.
+Pre-built binaries are available from https://github.com/riobard/go-shadowsocks2/releases
+
+You can also build from source:
 
 ```sh
 go get -u -v github.com/riobard/go-shadowsocks2
 ```
+
+Requires Go >= 1.10.
 
 
 ## Basic Usage
@@ -96,8 +100,6 @@ iperf3 -c localhost -p 1090
 ## TODO
 
 - Test coverage
-- Binary releases for common platforms
-
 
 
 ## Design Principles

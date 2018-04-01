@@ -3,7 +3,7 @@ sudo: false
 go:
   - 1.x
 install: go get -u -t -v ./...
-script: make releases
+script: make -j releases
 deploy:
   provider: releases
   api_key:
@@ -13,3 +13,5 @@ deploy:
   skip_cleanup: true
   on:
     repo: riobard/go-shadowsocks2
+    branch: master
+    tags: true

@@ -2,6 +2,7 @@
 package socks
 
 import (
+	"errors"
 	"io"
 	"net"
 	"strconv"
@@ -181,6 +182,9 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
 		return nil, err
 	}
 	buf = buf[:n]
+	if len(buf) < 2 {
+		return nil, errors.New("Missing CMD")
+	}
 
 	if buf[1] != CmdConnect {
 		return nil, ErrCommandNotSupported

@@ -34,6 +34,7 @@ func main() {
 		Socks     string
 		RedirTCP  string
 		RedirTCP6 string
+		TproxyTCP string
 	}
 
 	listCiphers := flag.Bool("cipher", false, "List supported ciphers")
@@ -45,6 +46,7 @@ func main() {
 	flag.StringVar(&flags.Socks, "socks", "", "(client-only) SOCKS listen address")
 	flag.StringVar(&flags.RedirTCP, "redir", "", "(client-only) redirect TCP from this address")
 	flag.StringVar(&flags.RedirTCP6, "redir6", "", "(client-only) redirect TCP IPv6 from this address")
+	flag.StringVar(&flags.TproxyTCP, "tproxytcp", "", "(client-only) TPROXY TCP listen address")
 	flag.DurationVar(&config.UDPTimeout, "udptimeout", 120*time.Second, "UDP tunnel timeout")
 	flag.Parse()
 
@@ -95,6 +97,10 @@ func main() {
 
 		if flags.RedirTCP6 != "" {
 			go redir6Local(flags.RedirTCP6, d)
+		}
+
+		if flags.TproxyTCP != "" {
+			go tproxyTCP(flags.TproxyTCP, d)
 		}
 	}
 

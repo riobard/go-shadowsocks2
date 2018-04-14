@@ -83,3 +83,43 @@ func ipv6_getorigdst(fd uintptr) (socks.Addr, error) {
 	addr[1+net.IPv6len], addr[1+net.IPv6len+1] = port[0], port[1]
 	return addr, nil
 }
+
+func tproxyTCP(addr string, d Dialer) error {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	rc, err := l.(*net.TCPListener).SyscallConn()
+	if err != nil {
+		return err
+	}
+	rc.Control(func(fd uintptr) { err = syscall.SetsockoptInt(int(fd), syscall.SOL_IP, syscall.IP_TRANSPARENT, 1) })
+	if err != nil {
+		return err
+	}
+	logf("TPROXY on tcp://%v", addr)
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			return err
+		}
+		go func() {
+			defer c.Close()
+			tcpKeepAlive(c)
+			rc, err := d.Dial("tcp", c.LocalAddr().String())
+			if err != nil {
+				logf("failed to connect: %v", err)
+				return
+			}
+			defer rc.Close()
+			tcpKeepAlive(rc)
+			logf("TPROXY TCP %s <--[%s]--> %s", c.RemoteAddr(), rc.RemoteAddr(), c.LocalAddr())
+			if err = relay(rc, c); err != nil {
+				if err, ok := err.(net.Error); ok && err.Timeout() {
+					return // ignore i/o timeout
+				}
+				logf("relay error: %v", err)
+			}
+		}()
+	}
+}

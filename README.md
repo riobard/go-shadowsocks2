@@ -4,16 +4,23 @@ A fresh implementation of Shadowsocks in Go.
 
 GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
+[![Build Status](https://travis-ci.org/shadowsocks/go-shadowsocks2.svg?branch=master)](https://travis-ci.org/shadowsocks/go-shadowsocks2)
+
 
 ## Features
 
-- SOCKS5 proxy (Including UDP Associate)
-- Support for Netfilter TCP redirect (IPv6 should work but not tested)
-- UDP tunneling (e.g. relay DNS packets)
-- TCP tunneling (e.g. benchmark with iperf3)
+- [x] SOCKS5 proxy with UDP Associate
+- [x] Support for Netfilter TCP redirect (IPv6 should work but not tested)
+- [x] UDP tunneling (e.g. relay DNS packets)
+- [x] TCP tunneling (e.g. benchmark with iperf3)
 
 
 ## Install
+
+
+Pre-built binaries for common platforms are available at https://github.com/shadowsocks/go-shadowsocks2/releases
+
+Install from source
 
 ```sh
 go get -u -v github.com/shadowsocks/go-shadowsocks2
@@ -112,13 +119,6 @@ Start iperf3 client to connect to the tunneld port instead
 ```sh
 iperf3 -c localhost -p 1090
 ```
-
-
-## TODO
-
-- Test coverage
-- Binary releases for common platforms
-
 
 
 ## Design Principles

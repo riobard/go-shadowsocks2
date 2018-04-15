@@ -17,7 +17,6 @@ GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
 ## Install
 
-
 Pre-built binaries for common platforms are available at https://github.com/shadowsocks/go-shadowsocks2/releases
 
 Install from source
@@ -29,13 +28,12 @@ go get -u -v github.com/shadowsocks/go-shadowsocks2
 
 ## Basic Usage
 
-
 ### Server
 
 Start a server listening on port 8488 using `AEAD_CHACHA20_POLY1305` AEAD cipher with password `your-password`.
 
 ```sh
-go-shadowsocks2 -s ss://AEAD_CHACHA20_POLY1305:your-password@:8488 -verbose
+shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose
 ```
 
 
@@ -46,36 +44,15 @@ connections, and tunnels both UDP and TCP on port 8053 and port 8054 to 8.8.8.8:
 respectively. 
 
 ```sh
-go-shadowsocks2 -c ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488 \
-     -verbose -socks :1080 -u -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53 \
-                              -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
+shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
+    -verbose -socks :1080 -u -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53 \
+                             -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
 ```
 
 Replace `[server_address]` with the server's public address.
 
 
 ## Advanced Usage
-
-
-### Use random keys instead of passwords
-
-A random key is almost always better than a password. Generate a base64url-encoded 16-byte random key
-
-```sh
-go-shadowsocks2 -keygen 16
-```
-
-Start a server listening on port 8848 using `AEAD_AES_128_GCM` AEAD cipher with the key generated above.
-
-```sh
-go-shadowsocks2 -s :8488 -cipher AEAD_AES_128_GCM -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
-```
-
-And the corresponding client to connect to it.
-
-```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher AEAD_AES_128_GCM -key k5yEIX5ciUDpkpdtvZm7zQ== -verbose
-```
 
 
 ### Netfilter TCP redirect (Linux only)
@@ -88,8 +65,7 @@ Start a client listening on port 1082 for redirected TCP connections and port 10
 TCP IPv6 connections.
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher AEAD_AES_128_GCM -key k5yEIX5ciUDpkpdtvZm7zQ== \
-    -redir :1082 -redir6 :1083
+shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -redir :1082 -redir6 :1083
 ```
 
 
@@ -110,8 +86,7 @@ Start a client on the same machine with the server. The client listens on port 1
 and tunnels to localhost:5201 where iperf3 is listening.
 
 ```sh
-go-shadowsocks2 -c [server_address]:8488 -cipher AEAD_AES_128_GCM -key k5yEIX5ciUDpkpdtvZm7zQ== \
-    -tcptun :1090=localhost:5201
+shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -tcptun :1090=localhost:5201
 ```
 
 Start iperf3 client to connect to the tunneld port instead
@@ -128,4 +103,3 @@ The code base strives to
 - be idiomatic Go and well organized;
 - use fewer external dependences as reasonably possible;
 - only include proven modern ciphers;
-

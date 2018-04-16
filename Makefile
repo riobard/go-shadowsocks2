@@ -15,10 +15,10 @@ win64:
 	GOARCH=amd64 GOOS=windows $(GOBUILD) -o $(BINDIR)/$(NAME)-$@.exe
 
 releases: linux macos win64
-	chmod +x $(BINDIR)/shadowsocks2-*
-	gzip $(BINDIR)/shadowsocks2-linux
-	gzip $(BINDIR)/shadowsocks2-macos
-	zip -m -j $(BINDIR)/shadowsocks2-win64.zip $(BINDIR)/shadowsocks2-win64.exe
+	chmod +x $(BINDIR)/$(NAME)-*
+	gzip $(BINDIR)/$(NAME)-linux
+	gzip $(BINDIR)/$(NAME)-macos
+	zip -m -j $(BINDIR)/$(NAME)-win64.zip $(BINDIR)/$(NAME)-win64.exe
 
 clean:
 	rm $(BINDIR)/*

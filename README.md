@@ -33,7 +33,7 @@ go get -u -v github.com/shadowsocks/go-shadowsocks2
 Start a server listening on port 8488 using `AEAD_CHACHA20_POLY1305` AEAD cipher with password `your-password`.
 
 ```sh
-shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose
+go-shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose
 ```
 
 
@@ -44,7 +44,7 @@ connections, and tunnels both UDP and TCP on port 8053 and port 8054 to 8.8.8.8:
 respectively. 
 
 ```sh
-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
+go-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
     -verbose -socks :1080 -u -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53 \
                              -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
 ```
@@ -65,7 +65,7 @@ Start a client listening on port 1082 for redirected TCP connections and port 10
 TCP IPv6 connections.
 
 ```sh
-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -redir :1082 -redir6 :1083
+go-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -redir :1082 -redir6 :1083
 ```
 
 
@@ -86,7 +86,7 @@ Start a client on the same machine with the server. The client listens on port 1
 and tunnels to localhost:5201 where iperf3 is listening.
 
 ```sh
-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -tcptun :1090=localhost:5201
+go-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' -tcptun :1090=localhost:5201
 ```
 
 Start iperf3 client to connect to the tunneld port instead

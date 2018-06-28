@@ -46,19 +46,20 @@ func Unpack(dst, pkt []byte, s Cipher) ([]byte, error) {
 type packetConn struct {
 	net.PacketConn
 	Cipher
-	buf        []byte
+	wbuf       []byte
+	rbuf       []byte
 	sync.Mutex // write lock
 }
 
 // NewPacketConn wraps a net.PacketConn with stream cipher encryption/decryption.
 func NewPacketConn(c net.PacketConn, ciph Cipher) net.PacketConn {
-	return &packetConn{PacketConn: c, Cipher: ciph, buf: make([]byte, 64*1024)}
+	return &packetConn{PacketConn: c, Cipher: ciph, wbuf: make([]byte, 64*1024), rbuf: make([]byte, 64*1024)}
 }
 
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	c.Lock()
 	defer c.Unlock()
-	buf, err := Pack(c.buf, b, c.Cipher)
+	buf, err := Pack(c.wbuf, b, c.Cipher)
 	if err != nil {
 		return 0, err
 	}
@@ -67,10 +68,10 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 }
 
 func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	n, addr, err := c.PacketConn.ReadFrom(b)
+	n, addr, err := c.PacketConn.ReadFrom(c.rbuf)
 	if err != nil {
 		return n, addr, err
 	}
-	b, err = Unpack(b, b[:n], c.Cipher)
+	b, err = Unpack(b, c.rbuf[:n], c.Cipher)
 	return len(b), addr, err
 }

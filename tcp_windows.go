@@ -1,5 +1,3 @@
-// +build !linux
-
 package main
 
 func redirLocal(addr string, d Dialer)  { panic("TCP redirect not supported") }

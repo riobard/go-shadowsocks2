@@ -76,5 +76,5 @@ func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 		return n, addr, err
 	}
 	copy(b, bb)
-	return len(b), addr, err
+	return len(bb), addr, err
 }

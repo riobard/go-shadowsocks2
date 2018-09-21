@@ -41,7 +41,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		buf[0], buf[1] = byte(nr>>8), byte(nr) // big-endian payload size
 		w.Seal(buf[:0], nonce, buf[:2], nil)
 		increment(nonce)
-		w.Seal(buf[:off], nonce, p[:nr], nil)
+		w.Seal(buf[:off], nonce, p[n:n+nr], nil)
 		increment(nonce)
 		_, err = w.Writer.Write(buf)
 	}

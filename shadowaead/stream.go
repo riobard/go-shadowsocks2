@@ -32,18 +32,18 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	nonce := w.nonce[:w.NonceSize()]
 	tag := w.Overhead()
 	off := 2 + tag
-	for nr := 0; n < len(p) && err == nil; n += nr {
-		nr = payloadSizeMask
-		if n+nr > len(p) {
-			nr = len(p) - n
+	for nr := payloadSizeMask; n < len(p); n += nr { // write piecemeal in max payload size chunks
+		if tail := len(p) - n; tail < payloadSizeMask {
+			nr = tail
 		}
-		buf = buf[:off+nr+tag]
 		buf[0], buf[1] = byte(nr>>8), byte(nr) // big-endian payload size
 		w.Seal(buf[:0], nonce, buf[:2], nil)
 		increment(nonce)
 		w.Seal(buf[:off], nonce, p[n:n+nr], nil)
 		increment(nonce)
-		_, err = w.Writer.Write(buf)
+		if _, err = w.Writer.Write(buf[:off+nr+tag]); err != nil {
+			return
+		}
 	}
 	return
 }

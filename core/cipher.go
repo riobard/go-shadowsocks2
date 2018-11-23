@@ -27,15 +27,22 @@ type PacketConnCipher interface {
 // ErrCipherNotSupported occurs when a cipher is not supported (likely because of security concerns).
 var ErrCipherNotSupported = errors.New("cipher not supported")
 
+const (
+	aeadAes128Gcm        = "AEAD_AES_128_GCM"
+	aeadAes192Gcm        = "AEAD_AES_192_GCM"
+	aeadAes256Gcm        = "AEAD_AES_256_GCM"
+	aeadChacha20Poly1305 = "AEAD_CHACHA20_POLY1305"
+)
+
 // List of AEAD ciphers: key size in bytes and constructor
 var aeadList = map[string]struct {
 	KeySize int
 	New     func([]byte) (shadowaead.Cipher, error)
 }{
-	"AEAD_AES_128_GCM":       {16, shadowaead.AESGCM},
-	"AEAD_AES_192_GCM":       {24, shadowaead.AESGCM},
-	"AEAD_AES_256_GCM":       {32, shadowaead.AESGCM},
-	"AEAD_CHACHA20_POLY1305": {32, shadowaead.Chacha20Poly1305},
+	aeadAes128Gcm:        {16, shadowaead.AESGCM},
+	aeadAes192Gcm:        {24, shadowaead.AESGCM},
+	aeadAes256Gcm:        {32, shadowaead.AESGCM},
+	aeadChacha20Poly1305: {32, shadowaead.Chacha20Poly1305},
 }
 
 // List of stream ciphers: key size in bytes and constructor
@@ -74,13 +81,13 @@ func PickCipher(name string, key []byte, password string) (Cipher, error) {
 	case "DUMMY":
 		return &dummy{}, nil
 	case "CHACHA20-IETF-POLY1305":
-		name = "AEAD_CHACHA20_POLY1305"
+		name = aeadChacha20Poly1305
 	case "AES-128-GCM":
-		name = "AEAD_AES_128_GCM"
-	case "AES-196-GCM":
-		name = "AEAD_AES_196_GCM"
+		name = aeadAes128Gcm
+	case "AES-192-GCM":
+		name = aeadAes192Gcm
 	case "AES-256-GCM":
-		name = "AEAD_AES_256_GCM"
+		name = aeadAes256Gcm
 	}
 
 	if choice, ok := aeadList[name]; ok {

@@ -13,6 +13,7 @@ GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 - [x] Support for Netfilter TCP redirect (IPv6 should work but not tested)
 - [x] UDP tunneling (e.g. relay DNS packets)
 - [x] TCP tunneling (e.g. benchmark with iperf3)
+- [x] SIP003 plugins
 
 
 ## Install
@@ -95,6 +96,28 @@ Start iperf3 client to connect to the tunneld port instead
 iperf3 -c localhost -p 1090
 ```
 
+### SIP003 Plugins (Experimental)
+
+Both client and server support SIP003 plugins.
+Use `-plugin` and `-plugin-opts` parameters to enable.
+
+Client:
+
+```sh
+shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
+    -verbose -socks :1080 -u -plugin v2ray
+```
+Server:
+
+```sh
+shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose \
+    -plugin v2ray -plugin-opts "server"
+```
+Note:
+
+It will look for the plugin in the current directory first, then `$PATH`.
+
+UDP connections will not be affected by SIP003.
 
 ## Design Principles
 

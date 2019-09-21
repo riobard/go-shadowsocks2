@@ -104,13 +104,13 @@ Use `-plugin` and `-plugin-opts` parameters to enable.
 Client:
 
 ```sh
-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
+go-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488' \
     -verbose -socks :1080 -u -plugin v2ray
 ```
 Server:
 
 ```sh
-shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose \
+go-shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose \
     -plugin v2ray -plugin-opts "server"
 ```
 Note:

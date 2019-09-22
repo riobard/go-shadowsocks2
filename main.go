@@ -173,6 +173,7 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
+	killPlugin()
 }
 
 func parseURL(s string) (addr, cipher, password string, err error) {

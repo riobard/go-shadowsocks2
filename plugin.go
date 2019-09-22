@@ -53,10 +53,16 @@ func killPlugin() {
 	}
 }
 
-func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort string) error {
+func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort string) (err error) {
+	pluginFile := plugin
 	if fileExists(plugin) {
 		if !filepath.IsAbs(plugin) {
-			plugin = "./" + plugin
+			pluginFile = "./" + plugin
+		}
+	} else {
+		pluginFile, err = exec.LookPath(plugin)
+		if err != nil {
+			return err
 		}
 	}
 	logH := newLogHelper("[" + plugin + "]: ")
@@ -68,13 +74,12 @@ func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort
 		"SS_PLUGIN_OPTIONS="+pluginOpts,
 	)
 	cmd := &exec.Cmd{
-		Path:   plugin,
-		Args:   []string{plugin},
+		Path:   pluginFile,
 		Env:    env,
 		Stdout: logH,
 		Stderr: logH,
 	}
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		return err
 	}
 	pluginCmd = cmd

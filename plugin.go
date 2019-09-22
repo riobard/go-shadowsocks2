@@ -5,7 +5,12 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"syscall"
+	"time"
 )
+
+var pluginCmd *exec.Cmd
 
 func startPlugin(plugin, pluginOpts, ssAddr string, isServer bool) (newAddr string, err error) {
 	logf("starting plugin (%s) with option (%s)....", plugin, pluginOpts)
@@ -31,9 +36,34 @@ func startPlugin(plugin, pluginOpts, ssAddr string, isServer bool) (newAddr stri
 	return
 }
 
-func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort string) error {
+func killPlugin() {
+	if pluginCmd != nil {
+		pluginCmd.Process.Signal(syscall.SIGTERM)
+		waitCh := make(chan struct{})
+		go func() {
+			pluginCmd.Wait()
+			close(waitCh)
+		}()
+		timeout := time.After(3 * time.Second)
+		select {
+		case <-waitCh:
+		case <-timeout:
+			pluginCmd.Process.Kill()
+		}
+	}
+}
+
+func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort string) (err error) {
+	pluginFile := plugin
 	if fileExists(plugin) {
-		plugin = "./" + plugin
+		if !filepath.IsAbs(plugin) {
+			pluginFile = "./" + plugin
+		}
+	} else {
+		pluginFile, err = exec.LookPath(plugin)
+		if err != nil {
+			return err
+		}
 	}
 	logH := newLogHelper("[" + plugin + "]: ")
 	env := append(os.Environ(),
@@ -44,15 +74,15 @@ func execPlugin(plugin, pluginOpts, remoteHost, remotePort, localHost, localPort
 		"SS_PLUGIN_OPTIONS="+pluginOpts,
 	)
 	cmd := &exec.Cmd{
-		Path:   plugin,
-		Args:   []string{plugin},
+		Path:   pluginFile,
 		Env:    env,
 		Stdout: logH,
 		Stderr: logH,
 	}
-	if err := cmd.Start(); err != nil {
+	if err = cmd.Start(); err != nil {
 		return err
 	}
+	pluginCmd = cmd
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			logf("plugin exited (%v)\n", err)

@@ -23,7 +23,7 @@ func (l *logHelper) Write(p []byte) (n int, err error) {
 		logger.Printf("%s%s\n", l.prefix, p)
 		return len(p), nil
 	}
-	return
+	return len(p), nil
 }
 
 func newLogHelper(prefix string) *logHelper {

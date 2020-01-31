@@ -1,6 +1,4 @@
 github.com/golang/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
-github.com/golang/crypto v0.0.0-20190426145343-a29dc8fdc734 h1:qNA2pFZuLItM7tUdO3b9JA2ibgtrUMUznl87BaPSgIg=
-github.com/golang/crypto v0.0.0-20190426145343-a29dc8fdc734/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 github.com/golang/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 github.com/golang/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:5JyrLPvD/ZdaYkT7IqKhsP5xt7aLjA99KXRtk4EIYDk=
 github.com/golang/sys v0.0.0-20190412213103-97732733099d h1:blRtD+FQOxZ6P7jigy+HS0R8zyGOMOv8TET4wCpzVwM=
@@ -8,3 +6,5 @@ github.com/golang/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQ
 github.com/golang/text v0.3.0/go.mod h1:GUiq9pdJKRKKAZXiVgWFEvocYuREvC14NhI4OPgEjeE=
 github.com/riobard/go-bloom v0.0.0-20200213042214-218e1707c495 h1:p7xbxYTzzfXghR1kpsJDeoVVRRWAotKc8u7FP/N48rU=
 github.com/riobard/go-bloom v0.0.0-20200213042214-218e1707c495/go.mod h1:HgjTstvQsPGkxUsCd2KWxErBblirPizecHcpD3ffK+s=
+golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d h1:9FCpayM9Egr1baVnV1SX0H87m+XB0B8S0hAMi99X/3U=
+golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=

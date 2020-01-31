@@ -32,7 +32,6 @@ var aeadList = map[string]struct {
 	New     func([]byte) (shadowaead.Cipher, error)
 }{
 	"AEAD_AES_128_GCM":       {16, shadowaead.AESGCM},
-	"AEAD_AES_192_GCM":       {24, shadowaead.AESGCM},
 	"AEAD_AES_256_GCM":       {32, shadowaead.AESGCM},
 	"AEAD_CHACHA20_POLY1305": {32, shadowaead.Chacha20Poly1305},
 }
@@ -58,8 +57,6 @@ func PickCipher(name string, key []byte, password string) (Cipher, error) {
 		name = "AEAD_CHACHA20_POLY1305"
 	case "AES-128-GCM":
 		name = "AEAD_AES_128_GCM"
-	case "AES-196-GCM":
-		name = "AEAD_AES_196_GCM"
 	case "AES-256-GCM":
 		name = "AEAD_AES_256_GCM"
 	}

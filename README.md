@@ -1,5 +1,7 @@
 # go-shadowsocks2
 
+![Go](https://github.com/riobard/go-shadowsocks2/workflows/Go/badge.svg)
+
 A fresh implementation of Shadowsocks in Go.
 
 GoDoc at https://godoc.org/github.com/riobard/go-shadowsocks2/

@@ -1,7 +1,5 @@
 name: Release
-on: 
-  release:
-    types: [published]
+on: release
 jobs:
   release-linux-amd64:
     name: release linux/amd64

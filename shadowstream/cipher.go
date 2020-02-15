@@ -3,11 +3,15 @@ package shadowstream
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"errors"
 	"strconv"
 
 	"github.com/aead/chacha20"
 	"github.com/aead/chacha20/chacha"
 )
+
+// ErrRepeatedSalt means detected a reused salt
+var ErrRepeatedSalt = errors.New("repeated salt detected")
 
 // Cipher generates a pair of stream ciphers for encryption and decryption.
 type Cipher interface {

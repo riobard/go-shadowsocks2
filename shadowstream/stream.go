@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"io"
 	"net"
+
+	"github.com/shadowsocks/go-shadowsocks2/internal"
 )
 
 const bufSize = 32 * 1024
@@ -114,6 +116,10 @@ func (c *conn) initReader() error {
 		if _, err := io.ReadFull(c.Conn, iv); err != nil {
 			return err
 		}
+		if internal.TestSalt(iv) {
+			return ErrRepeatedSalt
+		}
+		internal.AddSalt(iv)
 		c.r = &reader{Reader: c.Conn, Stream: c.Decrypter(iv), buf: buf}
 	}
 	return nil
@@ -147,6 +153,7 @@ func (c *conn) initWriter() error {
 		if _, err := c.Conn.Write(iv); err != nil {
 			return err
 		}
+		internal.AddSalt(iv)
 		c.w = &writer{Writer: c.Conn, Stream: c.Encrypter(iv), buf: buf}
 	}
 	return nil

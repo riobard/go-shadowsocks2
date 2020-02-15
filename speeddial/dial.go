@@ -23,10 +23,10 @@ func logf(format string, v ...interface{}) {
 type Dial func() (net.Conn, error)
 
 type target struct {
-	dial     Dial
 	last     int64 // last dial since epoch
 	latency  int64 // exponetially smoothed
 	inflight int32 // number of inflight dial
+	dial     Dial
 }
 
 func (t *target) Dial() (net.Conn, error) {

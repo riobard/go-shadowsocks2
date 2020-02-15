@@ -119,6 +119,22 @@ It will look for the plugin in the current directory first, then `$PATH`.
 
 UDP connections will not be affected by SIP003.
 
+### Reuse Detection
+
+This feature used for resistance with reuse attack by checking cipher salt/iv is repeated.
+
+Expose some environment variables below to control this feature:
+- `SHADOWSOCKS_SF_CAPACITY`(an integer): The most recently salt items to keep for checking duplication. Default 1e6, 
+on gave a non-positive integer this feature will be disabled;
+- `SHADOWSOCKS_SF_FPR`(decimal): False positive rate of the filter, 0.0003 means 0.03% FPR. Default 1e-6;
+- `SHADOWSOCKS_SF_SLOT`(a positive integer): All the salt items will be added into lots(how many this variable defines) 
+filter items for the check. Default 10.
+
+
+```sh
+SHADOWSOCKS_SF_CAPACITY=1e6 SHADOWSOCKS_SF_FPR=1e-6 SHADOWSOCKS_SF_SLOT=10 go-shadowsocks2 ...
+```
+
 ## Design Principles
 
 The code base strives to

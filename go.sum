@@ -8,7 +8,5 @@ github.com/golang/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:5JyrLPvD/ZdaY
 github.com/golang/sys v0.0.0-20190412213103-97732733099d h1:blRtD+FQOxZ6P7jigy+HS0R8zyGOMOv8TET4wCpzVwM=
 github.com/golang/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 github.com/golang/text v0.3.0/go.mod h1:GUiq9pdJKRKKAZXiVgWFEvocYuREvC14NhI4OPgEjeE=
-github.com/riobard/go-bloom v0.0.0-20170218180955-2b113c64a69b h1:H9yjH/g5w8MOPjQR2zMSP/Md1kKtj/33fIht9ChC2OU=
-github.com/riobard/go-bloom v0.0.0-20170218180955-2b113c64a69b/go.mod h1:HgjTstvQsPGkxUsCd2KWxErBblirPizecHcpD3ffK+s=
 github.com/riobard/go-bloom v0.0.0-20200213042214-218e1707c495 h1:p7xbxYTzzfXghR1kpsJDeoVVRRWAotKc8u7FP/N48rU=
 github.com/riobard/go-bloom v0.0.0-20200213042214-218e1707c495/go.mod h1:HgjTstvQsPGkxUsCd2KWxErBblirPizecHcpD3ffK+s=

@@ -4,16 +4,18 @@ A fresh implementation of Shadowsocks in Go.
 
 GoDoc at https://godoc.org/github.com/shadowsocks/go-shadowsocks2/
 
-[![Build Status](https://travis-ci.com/shadowsocks/go-shadowsocks2.svg?branch=master)](https://travis-ci.com/shadowsocks/go-shadowsocks2)
+![Build and test](https://github.com/shadowsocks/go-shadowsocks2/workflows/Build%20and%20test/badge.svg)
 
 
 ## Features
 
 - [x] SOCKS5 proxy with UDP Associate
-- [x] Support for Netfilter TCP redirect (IPv6 should work but not tested)
+- [x] Support for Netfilter TCP redirect on Linux (IPv6 should work but not tested)
+- [x] Support for Packet Filter TCP redirect on MacOS/Darwin (IPv4 only)
 - [x] UDP tunneling (e.g. relay DNS packets)
 - [x] TCP tunneling (e.g. benchmark with iperf3)
 - [x] SIP003 plugins
+- [x] Replay attack mitigation
 
 
 ## Install
@@ -56,7 +58,7 @@ Replace `[server_address]` with the server's public address.
 ## Advanced Usage
 
 
-### Netfilter TCP redirect (Linux only)
+### Netfilter TCP redirect on Linux
 
 The client offers `-redir` and `-redir6` (for IPv6) options to handle TCP connections 
 redirected by Netfilter on Linux. The feature works similar to `ss-redir` from `shadowsocks-libev`.
@@ -119,17 +121,15 @@ It will look for the plugin in the current directory first, then `$PATH`.
 
 UDP connections will not be affected by SIP003.
 
-### Reuse Detection
+### Replay Attack Mitigation
 
-This feature used for resistance with reuse attack by checking cipher salt/iv is repeated.
+By default a [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) is deployed to defend against [replay attacks](https://en.wikipedia.org/wiki/Replay_attack).
+Use the following environment variables to fine-tune the mechanism:
 
-Expose some environment variables below to control this feature:
-- `SHADOWSOCKS_SF_CAPACITY`(an integer): The most recently salt items to keep for checking duplication. Default 1e6, 
-on gave a non-positive integer this feature will be disabled;
-- `SHADOWSOCKS_SF_FPR`(decimal): False positive rate of the filter, 0.0003 means 0.03% FPR. Default 1e-6;
-- `SHADOWSOCKS_SF_SLOT`(a positive integer): All the salt items will be added into lots(how many this variable defines) 
-filter items for the check. Default 10.
-
+- `SHADOWSOCKS_SF_CAPACITY`: Number of recent connections to track. Default `1e6` (one million). Setting it to 0 disables the feature.
+- `SHADOWSOCKS_SF_FPR`: False positive rate of the Bloom filter. Default `1e-6` (0.0001%). This should be enough for most cases.
+- `SHADOWSOCKS_SF_SLOT`: The Bloom filter is divided into a number (default `10`) of slots. When the Bloom filter is full, the
+  oldest slot will be cleared for recycling. In general you should not change this number unless you understand what you are doing.
 
 ```sh
 SHADOWSOCKS_SF_CAPACITY=1e6 SHADOWSOCKS_SF_FPR=1e-6 SHADOWSOCKS_SF_SLOT=10 go-shadowsocks2 ...

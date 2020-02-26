@@ -19,6 +19,10 @@ func tcpLocal(l net.Listener, d Dialer) {
 		go func() {
 			defer c.Close()
 			laddr := c.LocalAddr()
+			if laddr == nil {
+				logf("failed to determine target address")
+				return
+			}
 			rc, err := d.Dial(laddr.Network(), laddr.String())
 			if err != nil {
 				logf("failed to connect: %v", err)

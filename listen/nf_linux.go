@@ -1,4 +1,4 @@
-package main
+package listen
 
 import (
 	"context"
@@ -54,9 +54,5 @@ func tproxyListen(network, address string) (net.Listener, error) {
 		}
 		return err2
 	}}
-	l, err := lcfg.Listen(context.Background(), network, address)
-	if err != nil {
-		return nil, err
-	}
-	return l, nil
+	return lcfg.Listen(context.Background(), network, address)
 }

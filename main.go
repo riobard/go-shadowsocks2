@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/riobard/go-shadowsocks2/core"
+	"github.com/riobard/go-shadowsocks2/listen"
 )
 
 var config struct {
@@ -33,7 +34,6 @@ func main() {
 		UDPTun    PairList
 		Socks     string
 		RedirTCP  string
-		RedirTCP6 string
 		TproxyTCP string
 	}
 
@@ -82,7 +82,7 @@ func main() {
 
 		if len(flags.TCPTun) > 0 {
 			for _, p := range flags.TCPTun {
-				l, err := tunListen("tcp", p[0], p[1])
+				l, err := listen.ListenTo("tcp", p[0], p[1])
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -92,7 +92,7 @@ func main() {
 		}
 
 		if flags.Socks != "" {
-			l, err := socksListen("tcp", flags.Socks)
+			l, err := listen.Listen("socks", "tcp", flags.Socks)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -101,7 +101,7 @@ func main() {
 		}
 
 		if flags.RedirTCP != "" {
-			l, err := listen("redir", "tcp", flags.RedirTCP)
+			l, err := listen.Listen("redir", "tcp", flags.RedirTCP)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -110,7 +110,7 @@ func main() {
 		}
 
 		if flags.TproxyTCP != "" {
-			l, err := listen("tproxy", "tcp", flags.TproxyTCP)
+			l, err := listen.Listen("tproxy", "tcp", flags.TproxyTCP)
 			if err != nil {
 				log.Fatal(err)
 			}

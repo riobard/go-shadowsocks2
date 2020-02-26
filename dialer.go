@@ -50,7 +50,6 @@ func fastdialer(u ...string) (*dialer, error) {
 			if err != nil {
 				return c, err
 			}
-			tcpKeepAlive(c)
 			c = ciph.StreamConn(c)
 			return c, nil
 		}

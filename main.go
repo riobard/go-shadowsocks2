@@ -45,8 +45,7 @@ func main() {
 	flag.Var(&flags.UDPTun, "udptun", "(client-only) UDP tunnel (laddr1=raddr1,laddr2=raddr2,...)")
 	flag.StringVar(&flags.Socks, "socks", "", "(client-only) SOCKS listen address")
 	flag.StringVar(&flags.RedirTCP, "redir", "", "(client-only) redirect TCP from this address")
-	flag.StringVar(&flags.RedirTCP6, "redir6", "", "(client-only) redirect TCP IPv6 from this address")
-	flag.StringVar(&flags.TproxyTCP, "tproxytcp", "", "(client-only) TPROXY TCP listen address")
+	flag.StringVar(&flags.TproxyTCP, "tproxytcp", "", "(Linux client-only) TPROXY TCP listen address")
 	flag.DurationVar(&config.UDPTimeout, "udptimeout", 120*time.Second, "UDP tunnel timeout")
 	flag.Parse()
 
@@ -83,24 +82,40 @@ func main() {
 
 		if len(flags.TCPTun) > 0 {
 			for _, p := range flags.TCPTun {
-				go tcpTun(p[0], p[1], d)
+				l, err := tunListen("tcp", p[0], p[1])
+				if err != nil {
+					log.Fatal(err)
+				}
+				logf("tcptun %v --> %v", p[0], p[1])
+				go tcpLocal(l, d)
 			}
 		}
 
 		if flags.Socks != "" {
-			go socksLocal(flags.Socks, d)
+			l, err := socksListen("tcp", flags.Socks)
+			if err != nil {
+				log.Fatal(err)
+			}
+			logf("socks %v", flags.Socks)
+			go tcpLocal(l, d)
 		}
 
 		if flags.RedirTCP != "" {
-			go redirLocal(flags.RedirTCP, d)
-		}
-
-		if flags.RedirTCP6 != "" {
-			go redir6Local(flags.RedirTCP6, d)
+			l, err := listen("redir", "tcp", flags.RedirTCP)
+			if err != nil {
+				log.Fatal(err)
+			}
+			logf("redir tcp %v", flags.RedirTCP)
+			go tcpLocal(l, d)
 		}
 
 		if flags.TproxyTCP != "" {
-			go tproxyTCP(flags.TproxyTCP, d)
+			l, err := listen("tproxy", "tcp", flags.TproxyTCP)
+			if err != nil {
+				log.Fatal(err)
+			}
+			logf("tproxy tcp %v", flags.TproxyTCP)
+			go tcpLocal(l, d)
 		}
 	}
 

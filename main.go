@@ -3,50 +3,14 @@ package main
 import (
 	"flag"
 	"log"
-	"net/url"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/riobard/go-shadowsocks2/core"
 	"github.com/riobard/go-shadowsocks2/listen"
 )
 
-var config struct {
-	Verbose    bool
-	UDPTimeout time.Duration
-}
-
-func logf(f string, v ...interface{}) {
-	if config.Verbose {
-		log.Printf(f, v...)
-	}
-}
-
 func main() {
-
-	var flags struct {
-		Client    SpaceSeparatedList
-		Server    SpaceSeparatedList
-		TCPTun    PairList
-		UDPTun    PairList
-		Socks     string
-		RedirTCP  string
-		TproxyTCP string
-	}
-
 	listCiphers := flag.Bool("cipher", false, "List supported ciphers")
-	flag.BoolVar(&config.Verbose, "verbose", false, "verbose mode")
-	flag.Var(&flags.Server, "s", "server listen url")
-	flag.Var(&flags.Client, "c", "client connect url")
-	flag.Var(&flags.TCPTun, "tcptun", "(client-only) TCP tunnel (laddr1=raddr1,laddr2=raddr2,...)")
-	flag.Var(&flags.UDPTun, "udptun", "(client-only) UDP tunnel (laddr1=raddr1,laddr2=raddr2,...)")
-	flag.StringVar(&flags.Socks, "socks", "", "(client-only) SOCKS listen address")
-	flag.StringVar(&flags.RedirTCP, "redir", "", "(client-only) redirect TCP from this address")
-	flag.StringVar(&flags.TproxyTCP, "tproxytcp", "", "(Linux client-only) TPROXY TCP listen address")
-	flag.DurationVar(&config.UDPTimeout, "udptimeout", 120*time.Second, "UDP tunnel timeout")
 	flag.Parse()
 
 	if *listCiphers {
@@ -54,131 +18,101 @@ func main() {
 		return
 	}
 
-	if len(flags.Client) == 0 && len(flags.Server) == 0 {
+	if len(config.Client) == 0 && len(config.Server) == 0 {
 		flag.Usage()
 		return
 	}
 
-	if len(flags.Client) > 0 { // client mode
-		if len(flags.UDPTun) > 0 { // use first server for UDP
-			addr, cipher, password, err := parseURL(flags.Client[0])
-			if err != nil {
-				log.Fatal(err)
-			}
+	if len(config.Client) > 0 {
+		client()
+	}
 
-			ciph, err := core.PickCipher(cipher, nil, password)
-			if err != nil {
-				log.Fatal(err)
-			}
-			for _, p := range flags.UDPTun {
-				go udpLocal(p[0], addr, p[1], ciph.PacketConn)
-			}
-		}
+	if len(config.Server) > 0 {
+		server()
+	}
 
-		d, err := fastdialer(flags.Client...)
+	select {}
+}
+
+func client() {
+	if len(config.UDPTun) > 0 { // use first server for UDP
+		addr, cipher, password, err := parseURL(config.Client[0])
 		if err != nil {
-			log.Fatalf("failed to create dialer: %v", err)
+			log.Fatal(err)
 		}
 
-		if len(flags.TCPTun) > 0 {
-			for _, p := range flags.TCPTun {
-				l, err := listen.ListenTo("tcp", p[0], p[1])
-				if err != nil {
-					log.Fatal(err)
-				}
-				logf("tcptun %v --> %v", p[0], p[1])
-				go tcpLocal(l, d)
-			}
+		ciph, err := core.PickCipher(cipher, nil, password)
+		if err != nil {
+			log.Fatal(err)
 		}
-
-		if flags.Socks != "" {
-			l, err := listen.Listen("socks", "tcp", flags.Socks)
-			if err != nil {
-				log.Fatal(err)
-			}
-			logf("socks %v", flags.Socks)
-			go tcpLocal(l, d)
-		}
-
-		if flags.RedirTCP != "" {
-			l, err := listen.Listen("redir", "tcp", flags.RedirTCP)
-			if err != nil {
-				log.Fatal(err)
-			}
-			logf("redir tcp %v", flags.RedirTCP)
-			go tcpLocal(l, d)
-		}
-
-		if flags.TproxyTCP != "" {
-			l, err := listen.Listen("tproxy", "tcp", flags.TproxyTCP)
-			if err != nil {
-				log.Fatal(err)
-			}
-			logf("tproxy tcp %v", flags.TproxyTCP)
-			go tcpLocal(l, d)
+		for _, p := range config.UDPTun {
+			go udpLocal(p[0], addr, p[1], ciph.PacketConn)
 		}
 	}
 
-	if len(flags.Server) > 0 { // server mode
-		for _, each := range flags.Server {
-			addr, cipher, password, err := parseURL(each)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			ciph, err := core.PickCipher(cipher, nil, password)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			go udpRemote(addr, ciph.PacketConn)
-			go tcpRemote(addr, ciph.StreamConn)
-		}
-	}
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
-}
-
-func parseURL(s string) (addr, cipher, password string, err error) {
-	u, err := url.Parse(s)
+	d, err := fastdialer(config.Client...)
 	if err != nil {
-		return
+		log.Fatalf("failed to create dialer: %v", err)
 	}
 
-	addr = u.Host
-	if u.User != nil {
-		cipher = u.User.Username()
-		password, _ = u.User.Password()
-	}
-	return
-}
-
-type PairList [][2]string // key1=val1,key2=val2,...
-
-func (l PairList) String() string {
-	s := make([]string, len(l))
-	for i, pair := range l {
-		s[i] = pair[0] + "=" + pair[1]
-	}
-	return strings.Join(s, ",")
-}
-func (l *PairList) Set(s string) error {
-	for _, item := range strings.Split(s, ",") {
-		pair := strings.Split(item, "=")
-		if len(pair) != 2 {
-			return nil
+	if len(config.TCPTun) > 0 {
+		for _, p := range config.TCPTun {
+			l, err := listen.ListenTo("tcp", p[0], p[1])
+			if err != nil {
+				log.Fatal(err)
+			}
+			logf("tcptun %v --> %v", p[0], p[1])
+			go tcpLocal(l, d)
 		}
-		*l = append(*l, [2]string{pair[0], pair[1]})
 	}
-	return nil
+
+	if config.Socks != "" {
+		l, err := listen.Listen("socks", "tcp", config.Socks)
+		if err != nil {
+			log.Fatal(err)
+		}
+		logf("socks %v", config.Socks)
+		go tcpLocal(l, d)
+	}
+
+	if config.RedirTCP != "" {
+		l, err := listen.Listen("redir", "tcp", config.RedirTCP)
+		if err != nil {
+			log.Fatal(err)
+		}
+		logf("redir tcp %v", config.RedirTCP)
+		go tcpLocal(l, d)
+	}
+
+	if config.TproxyTCP != "" {
+		l, err := listen.Listen("tproxy", "tcp", config.TproxyTCP)
+		if err != nil {
+			log.Fatal(err)
+		}
+		logf("tproxy tcp %v", config.TproxyTCP)
+		go tcpLocal(l, d)
+	}
 }
 
-type SpaceSeparatedList []string
+func server() {
+	for _, each := range config.Server {
+		addr, cipher, password, err := parseURL(each)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-func (l SpaceSeparatedList) String() string { return strings.Join(l, " ") }
-func (l *SpaceSeparatedList) Set(s string) error {
-	*l = strings.Split(s, " ")
-	return nil
+		ciph, err := core.PickCipher(cipher, nil, password)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go udpRemote(addr, ciph.PacketConn)
+		go tcpRemote(addr, ciph.StreamConn)
+	}
+}
+
+func logf(f string, v ...interface{}) {
+	if config.Verbose {
+		log.Printf(f, v...)
+	}
 }

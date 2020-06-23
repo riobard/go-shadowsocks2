@@ -9,6 +9,7 @@ import (
 
 var config struct {
 	Verbose    bool
+	UDP        bool
 	UDPTimeout time.Duration
 	Client     SpaceSeparatedList
 	Server     SpaceSeparatedList
@@ -28,6 +29,7 @@ func init() {
 	flag.StringVar(&config.Socks, "socks", "", "(client-only) SOCKS listen address")
 	flag.StringVar(&config.RedirTCP, "redir", "", "(client-only) redirect TCP from this address")
 	flag.StringVar(&config.TproxyTCP, "tproxytcp", "", "(Linux client-only) TPROXY TCP listen address")
+	flag.BoolVar(&config.UDP, "udp", false, "(server-only) UDP support")
 	flag.DurationVar(&config.UDPTimeout, "udptimeout", 120*time.Second, "UDP tunnel timeout")
 }
 

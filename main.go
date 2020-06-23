@@ -106,7 +106,9 @@ func server() {
 			log.Fatal(err)
 		}
 
-		go udpRemote(addr, ciph.PacketConn)
+		if config.UDP {
+			go udpRemote(addr, ciph.PacketConn)
+		}
 		go tcpRemote(addr, ciph.StreamConn)
 	}
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"net"
+	"syscall"
+	"time"
 
 	"github.com/shadowsocks/go-shadowsocks2/pfutil"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
@@ -21,4 +23,19 @@ func natLookup(c net.Conn) (socks.Addr, error) {
 		return socks.ParseAddr(addr.String()), err
 	}
 	panic("not TCP connection")
+}
+
+func timedCork(c *net.TCPConn, d time.Duration) error {
+	rc, err := c.SyscallConn()
+	if err != nil {
+		return err
+	}
+	rc.Control(func(fd uintptr) { err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, syscall.TCP_NOPUSH, 1) })
+	if err != nil {
+		return err
+	}
+	time.AfterFunc(d, func() {
+		rc.Control(func(fd uintptr) { syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, syscall.TCP_NOPUSH, 0) })
+	})
+	return nil
 }

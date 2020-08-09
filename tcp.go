@@ -70,7 +70,11 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
+			tc := rc.(*net.TCPConn)
+			tc.SetKeepAlive(true)
+			if config.TCPCork {
+				timedCork(tc, 10*time.Millisecond)
+			}
 			rc = shadow(rc)
 
 			if _, err = rc.Write(tgt); err != nil {

@@ -42,7 +42,6 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
 			tgt, err := getAddr(c)
 			if err != nil {
 
@@ -71,7 +70,6 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 			defer rc.Close()
 			tc := rc.(*net.TCPConn)
-			tc.SetKeepAlive(true)
 			if config.TCPCork {
 				timedCork(tc, 10*time.Millisecond)
 			}
@@ -112,7 +110,6 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
 			c = shadow(c)
 
 			tgt, err := socks.ReadAddr(c)
@@ -127,7 +124,6 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 				return
 			}
 			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
 			_, _, err = relay(c, rc)

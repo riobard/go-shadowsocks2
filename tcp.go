@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"io/ioutil"
 	"net"
 	"sync"
 	"time"
@@ -111,11 +112,17 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
-			c = shadow(c)
+			sc := shadow(c)
 
-			tgt, err := socks.ReadAddr(c)
+			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
 				logf("failed to get target address: %v", err)
+				// drain c to avoid leaking server behavioral features
+				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
+				_, err = io.Copy(ioutil.Discard, c)
+				if err != nil {
+					logf("discard error: %v", err)
+				}
 				return
 			}
 
@@ -127,7 +134,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			defer rc.Close()
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
-			err = relay(c, rc)
+			err = relay(sc, rc)
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					return // ignore i/o timeout

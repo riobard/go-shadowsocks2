@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/shadowsocks/go-shadowsocks2/socks"
@@ -81,7 +82,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			_, _, err = relay(rc, c)
+			err = relay(rc, c)
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					return // ignore i/o timeout
@@ -126,7 +127,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			defer rc.Close()
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
-			_, _, err = relay(c, rc)
+			err = relay(c, rc)
 			if err != nil {
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					return // ignore i/o timeout
@@ -137,29 +138,24 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 	}
 }
 
-// relay copies between left and right bidirectionally. Returns number of
-// bytes copied from right to left, from left to right, and any error occurred.
-func relay(left, right net.Conn) (int64, int64, error) {
-	type res struct {
-		N   int64
-		Err error
-	}
-	ch := make(chan res)
+// relay copies between left and right bidirectionally. Returns any error occurred.
+func relay(left, right net.Conn) error {
+	var err, err1 error
+	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
-		n, err := io.Copy(right, left)
-		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-		ch <- res{n, err}
+		defer wg.Done()
+		_, err1 = io.Copy(right, left)
+		right.SetReadDeadline(time.Now()) // unblock read on right
 	}()
 
-	n, err := io.Copy(left, right)
-	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	rs := <-ch
+	_, err = io.Copy(left, right)
+	left.SetReadDeadline(time.Now()) // unblock read on left
+	wg.Wait()
 
-	if err == nil {
-		err = rs.Err
+	if err1 != nil {
+		err = err1
 	}
-	return n, rs.N, err
+	return err
 }

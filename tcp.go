@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"io"
 	"io/ioutil"
 	"net"
@@ -71,9 +72,8 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 			defer rc.Close()
-			tc := rc.(*net.TCPConn)
 			if config.TCPCork {
-				timedCork(tc, 10*time.Millisecond)
+				rc = timedCork(rc, 10*time.Millisecond, 1280)
 			}
 			rc = shadow(rc)
 
@@ -165,4 +165,43 @@ func relay(left, right net.Conn) error {
 		err = err1
 	}
 	return err
+}
+
+type corkedConn struct {
+	net.Conn
+	bufw   *bufio.Writer
+	corked bool
+	delay  time.Duration
+	err    error
+	lock   sync.Mutex
+	once   sync.Once
+}
+
+func timedCork(c net.Conn, d time.Duration, bufSize int) net.Conn {
+	return &corkedConn{
+		Conn:   c,
+		bufw:   bufio.NewWriterSize(c, bufSize),
+		corked: true,
+		delay:  d,
+	}
+}
+
+func (w *corkedConn) Write(p []byte) (int, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.err != nil {
+		return 0, w.err
+	}
+	if w.corked {
+		w.once.Do(func() {
+			time.AfterFunc(w.delay, func() {
+				w.lock.Lock()
+				defer w.lock.Unlock()
+				w.corked = false
+				w.err = w.bufw.Flush()
+			})
+		})
+		return w.bufw.Write(p)
+	}
+	return w.Conn.Write(p)
 }

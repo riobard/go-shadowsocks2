@@ -33,9 +33,6 @@ func tcpLocal(l net.Listener, d Dialer) {
 			defer rc.Close()
 			logf("proxy %s <--[%s]--> %s", c.RemoteAddr(), rc.RemoteAddr(), laddr)
 			if err = relay(rc, c); err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
 				logf("relay error: %v", err)
 			}
 		}()

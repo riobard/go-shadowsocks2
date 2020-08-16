@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -75,33 +77,30 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
 			if err = relay(c, rc); err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
 				logf("relay error: %v", err)
 			}
 		}()
 	}
 }
 
-// relay copies between left and right bidirectionally. Returns any error occurred.
+// relay copies between left and right bidirectionally
 func relay(left, right net.Conn) error {
 	var err, err1 error
 	var wg sync.WaitGroup
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		_, err1 = io.Copy(right, left)
 		right.SetReadDeadline(time.Now()) // unblock read on right
 	}()
-
 	_, err = io.Copy(left, right)
 	left.SetReadDeadline(time.Now()) // unblock read on left
 	wg.Wait()
-
-	if err1 != nil {
-		err = err1
+	if err1 != nil && !errors.Is(err1, os.ErrDeadlineExceeded) { // requires Go 1.15+
+		return err1
 	}
-	return err
+	if err != nil && !errors.Is(err, os.ErrDeadlineExceeded) {
+		return err
+	}
+	return nil
 }

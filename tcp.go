@@ -119,7 +119,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
-				logf("failed to get target address: %v", err)
+				logf("failed to get target address from %v: %v", c.RemoteAddr(), err)
 				// drain c to avoid leaking server behavioral features
 				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
 				_, err = io.Copy(ioutil.Discard, c)

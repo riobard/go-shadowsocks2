@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"io"
 	"io/ioutil"
 	"net"
@@ -71,9 +72,8 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 			defer rc.Close()
-			tc := rc.(*net.TCPConn)
 			if config.TCPCork {
-				timedCork(tc, 10*time.Millisecond)
+				rc = timedCork(rc, 10*time.Millisecond, 1280)
 			}
 			rc = shadow(rc)
 
@@ -112,11 +112,14 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
+			if config.TCPCork {
+				c = timedCork(c, 10*time.Millisecond, 1280)
+			}
 			sc := shadow(c)
 
 			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
-				logf("failed to get target address: %v", err)
+				logf("failed to get target address from %v: %v", c.RemoteAddr(), err)
 				// drain c to avoid leaking server behavioral features
 				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
 				_, err = io.Copy(ioutil.Discard, c)
@@ -149,20 +152,59 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 func relay(left, right net.Conn) error {
 	var err, err1 error
 	var wg sync.WaitGroup
-
+	var wait = 5 * time.Second
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		_, err1 = io.Copy(right, left)
-		right.SetReadDeadline(time.Now()) // unblock read on right
+		right.SetReadDeadline(time.Now().Add(wait)) // unblock read on right
 	}()
 
 	_, err = io.Copy(left, right)
-	left.SetReadDeadline(time.Now()) // unblock read on left
+	left.SetReadDeadline(time.Now().Add(wait)) // unblock read on left
 	wg.Wait()
 
 	if err1 != nil {
 		err = err1
 	}
 	return err
+}
+
+type corkedConn struct {
+	net.Conn
+	bufw   *bufio.Writer
+	corked bool
+	delay  time.Duration
+	err    error
+	lock   sync.Mutex
+	once   sync.Once
+}
+
+func timedCork(c net.Conn, d time.Duration, bufSize int) net.Conn {
+	return &corkedConn{
+		Conn:   c,
+		bufw:   bufio.NewWriterSize(c, bufSize),
+		corked: true,
+		delay:  d,
+	}
+}
+
+func (w *corkedConn) Write(p []byte) (int, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.err != nil {
+		return 0, w.err
+	}
+	if w.corked {
+		w.once.Do(func() {
+			time.AfterFunc(w.delay, func() {
+				w.lock.Lock()
+				defer w.lock.Unlock()
+				w.corked = false
+				w.err = w.bufw.Flush()
+			})
+		})
+		return w.bufw.Write(p)
+	}
+	return w.Conn.Write(p)
 }

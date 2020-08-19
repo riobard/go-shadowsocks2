@@ -152,16 +152,16 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 func relay(left, right net.Conn) error {
 	var err, err1 error
 	var wg sync.WaitGroup
-
+	var wait = 5 * time.Second
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		_, err1 = io.Copy(right, left)
-		right.SetReadDeadline(time.Now()) // unblock read on right
+		right.SetReadDeadline(time.Now().Add(wait)) // unblock read on right
 	}()
 
 	_, err = io.Copy(left, right)
-	left.SetReadDeadline(time.Now()) // unblock read on left
+	left.SetReadDeadline(time.Now().Add(wait)) // unblock read on left
 	wg.Wait()
 
 	if err1 != nil {

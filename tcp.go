@@ -112,6 +112,9 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
+			if config.TCPCork {
+				c = timedCork(c, 10*time.Millisecond, 1280)
+			}
 			sc := shadow(c)
 
 			tgt, err := socks.ReadAddr(sc)

@@ -1,10 +1,11 @@
 module github.com/shadowsocks/go-shadowsocks2
 
-go 1.12
+go 1.15
 
 require (
-	github.com/riobard/go-bloom v0.0.0-20200213042214-218e1707c495
-	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
+	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/sys v0.0.0-20200824131525-c12d262b63d8 // indirect
 )
 
 replace (

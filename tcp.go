@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"io"
+	"io/ioutil"
 	"net"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/shadowsocks/go-shadowsocks2/socks"
@@ -42,13 +47,12 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
 			tgt, err := getAddr(c)
 			if err != nil {
 
 				// UDP: keep the connection until disconnect then free the UDP socket
 				if err == socks.InfoUDPAssociate {
-					buf := []byte{}
+					buf := make([]byte, 1)
 					// block here
 					for {
 						_, err := c.Read(buf)
@@ -70,7 +74,9 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
+			if config.TCPCork {
+				rc = timedCork(rc, 10*time.Millisecond, 1280)
+			}
 			rc = shadow(rc)
 
 			if _, err = rc.Write(tgt); err != nil {
@@ -79,11 +85,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			_, _, err = relay(rc, c)
-			if err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
+			if err = relay(rc, c); err != nil {
 				logf("relay error: %v", err)
 			}
 		}()
@@ -108,12 +110,20 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
-			c = shadow(c)
+			if config.TCPCork {
+				c = timedCork(c, 10*time.Millisecond, 1280)
+			}
+			sc := shadow(c)
 
-			tgt, err := socks.ReadAddr(c)
+			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
-				logf("failed to get target address: %v", err)
+				logf("failed to get target address from %v: %v", c.RemoteAddr(), err)
+				// drain c to avoid leaking server behavioral features
+				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
+				_, err = io.Copy(ioutil.Discard, c)
+				if err != nil {
+					logf("discard error: %v", err)
+				}
 				return
 			}
 
@@ -123,43 +133,73 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 				return
 			}
 			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
 
 			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
-			_, _, err = relay(c, rc)
-			if err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
+			if err = relay(sc, rc); err != nil {
 				logf("relay error: %v", err)
 			}
 		}()
 	}
 }
 
-// relay copies between left and right bidirectionally. Returns number of
-// bytes copied from right to left, from left to right, and any error occurred.
-func relay(left, right net.Conn) (int64, int64, error) {
-	type res struct {
-		N   int64
-		Err error
-	}
-	ch := make(chan res)
-
+// relay copies between left and right bidirectionally
+func relay(left, right net.Conn) error {
+	var err, err1 error
+	var wg sync.WaitGroup
+	var wait = 5 * time.Second
+	wg.Add(1)
 	go func() {
-		n, err := io.Copy(right, left)
-		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-		left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-		ch <- res{n, err}
+		defer wg.Done()
+		_, err1 = io.Copy(right, left)
+		right.SetReadDeadline(time.Now().Add(wait)) // unblock read on right
 	}()
-
-	n, err := io.Copy(left, right)
-	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	rs := <-ch
-
-	if err == nil {
-		err = rs.Err
+	_, err = io.Copy(left, right)
+	left.SetReadDeadline(time.Now().Add(wait)) // unblock read on left
+	wg.Wait()
+	if err1 != nil && !errors.Is(err1, os.ErrDeadlineExceeded) { // requires Go 1.15+
+		return err1
 	}
-	return n, rs.N, err
+	if err != nil && !errors.Is(err, os.ErrDeadlineExceeded) {
+		return err
+	}
+	return nil
+}
+
+type corkedConn struct {
+	net.Conn
+	bufw   *bufio.Writer
+	corked bool
+	delay  time.Duration
+	err    error
+	lock   sync.Mutex
+	once   sync.Once
+}
+
+func timedCork(c net.Conn, d time.Duration, bufSize int) net.Conn {
+	return &corkedConn{
+		Conn:   c,
+		bufw:   bufio.NewWriterSize(c, bufSize),
+		corked: true,
+		delay:  d,
+	}
+}
+
+func (w *corkedConn) Write(p []byte) (int, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.err != nil {
+		return 0, w.err
+	}
+	if w.corked {
+		w.once.Do(func() {
+			time.AfterFunc(w.delay, func() {
+				w.lock.Lock()
+				defer w.lock.Unlock()
+				w.corked = false
+				w.err = w.bufw.Flush()
+			})
+		})
+		return w.bufw.Write(p)
+	}
+	return w.Conn.Write(p)
 }

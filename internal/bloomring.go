@@ -41,6 +41,9 @@ func NewBloomRing(slot, capacity int, falsePositiveRate float64) *BloomRing {
 }
 
 func (r *BloomRing) Add(b []byte) {
+	if r == nil {
+		return
+	}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	slot := r.slots[r.slotPosition]
@@ -56,6 +59,9 @@ func (r *BloomRing) Add(b []byte) {
 }
 
 func (r *BloomRing) Test(b []byte) bool {
+	if r == nil {
+		return false
+	}
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	for _, s := range r.slots {

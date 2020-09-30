@@ -45,15 +45,16 @@ func Unpack(dst, pkt []byte, ciph Cipher) ([]byte, error) {
 	if len(pkt) < saltSize {
 		return nil, ErrShortPacket
 	}
+	saltfilter := internal.GetSaltFilterSingleton()
 	salt := pkt[:saltSize]
-	if internal.TestSalt(salt) {
+	if saltfilter.Test(salt) {
 		return nil, ErrRepeatedSalt
 	}
 	aead, err := ciph.Decrypter(salt)
 	if err != nil {
 		return nil, err
 	}
-	internal.AddSalt(salt)
+	saltfilter.Add(salt)
 	if len(pkt) < saltSize+aead.Overhead() {
 		return nil, ErrShortPacket
 	}

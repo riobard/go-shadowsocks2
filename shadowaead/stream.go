@@ -250,7 +250,7 @@ func (c *streamConn) initWriter() error {
 	if err != nil {
 		return err
 	}
-	internal.AddSalt(salt)
+	internal.GetSaltFilterSingleton().Add(salt)
 	c.w = newWriter(c.Conn, aead)
 	return nil
 }

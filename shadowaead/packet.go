@@ -29,7 +29,7 @@ func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	internal.AddSalt(salt)
+	internal.GetSaltFilterSingleton().Add(salt)
 
 	if len(dst) < saltSize+len(plaintext)+aead.Overhead() {
 		return nil, io.ErrShortBuffer

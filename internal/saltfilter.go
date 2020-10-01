@@ -27,7 +27,7 @@ var initSaltfilterOnce sync.Once
 
 // GetSaltFilterSingleton returns the BloomRing singleton,
 // initializing it on first call.
-func GetSaltFilterSingleton() *BloomRing {
+func getSaltFilterSingleton() *BloomRing {
 	initSaltfilterOnce.Do(func() {
 		var (
 			finalCapacity = DefaultSFCapacity
@@ -68,4 +68,14 @@ func GetSaltFilterSingleton() *BloomRing {
 		saltfilter = NewBloomRing(int(finalSlot), int(finalCapacity), finalFPR)
 	})
 	return saltfilter
+}
+
+// TestSalt returns true if salt is repeated
+func TestSalt(b []byte) bool {
+	return getSaltFilterSingleton().Test(b)
+}
+
+// AddSalt salt to filter
+func AddSalt(b []byte) {
+	getSaltFilterSingleton().Add(b)
 }

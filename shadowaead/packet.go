@@ -29,7 +29,7 @@ func Pack(dst, plaintext []byte, ciph Cipher) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	internal.GetSaltFilterSingleton().Add(salt)
+	internal.AddSalt(salt)
 
 	if len(dst) < saltSize+len(plaintext)+aead.Overhead() {
 		return nil, io.ErrShortBuffer
@@ -45,16 +45,15 @@ func Unpack(dst, pkt []byte, ciph Cipher) ([]byte, error) {
 	if len(pkt) < saltSize {
 		return nil, ErrShortPacket
 	}
-	saltfilter := internal.GetSaltFilterSingleton()
 	salt := pkt[:saltSize]
-	if saltfilter.Test(salt) {
+	if internal.TestSalt(salt) {
 		return nil, ErrRepeatedSalt
 	}
 	aead, err := ciph.Decrypter(salt)
 	if err != nil {
 		return nil, err
 	}
-	saltfilter.Add(salt)
+	internal.AddSalt(salt)
 	if len(pkt) < saltSize+aead.Overhead() {
 		return nil, ErrShortPacket
 	}

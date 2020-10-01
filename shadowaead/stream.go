@@ -205,15 +205,14 @@ func (c *streamConn) initReader() error {
 	if _, err := io.ReadFull(c.Conn, salt); err != nil {
 		return err
 	}
-	saltfilter := internal.GetSaltFilterSingleton()
-	if saltfilter.Test(salt) {
+	if internal.TestSalt(salt) {
 		return ErrRepeatedSalt
 	}
 	aead, err := c.Decrypter(salt)
 	if err != nil {
 		return err
 	}
-	saltfilter.Add(salt)
+	internal.AddSalt(salt)
 
 	c.r = newReader(c.Conn, aead)
 	return nil
@@ -250,7 +249,7 @@ func (c *streamConn) initWriter() error {
 	if err != nil {
 		return err
 	}
-	internal.GetSaltFilterSingleton().Add(salt)
+	internal.AddSalt(salt)
 	c.w = newWriter(c.Conn, aead)
 	return nil
 }

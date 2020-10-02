@@ -27,11 +27,28 @@ func TestBloomRing_Add(t *testing.T) {
 	bloomRingInstance.Add(make([]byte, 16))
 }
 
+func TestBloomRing_NilAdd(t *testing.T) {
+	defer func() {
+		if any := recover(); any != nil {
+			t.Fatalf("Should not got panic while adding item: %v", any)
+		}
+	}()
+	var nilRing *internal.BloomRing
+	nilRing.Add(make([]byte, 16))
+}
+
 func TestBloomRing_Test(t *testing.T) {
 	buf := []byte("shadowsocks")
 	bloomRingInstance.Add(buf)
 	if !bloomRingInstance.Test(buf) {
 		t.Fatal("Test on filter missing")
+	}
+}
+
+func TestBloomRing_NilTestIsFalse(t *testing.T) {
+	var nilRing *internal.BloomRing
+	if nilRing.Test([]byte("shadowsocks")) {
+		t.Fatal("Test should return false for nil BloomRing")
 	}
 }
 

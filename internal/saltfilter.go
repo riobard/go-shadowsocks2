@@ -79,3 +79,7 @@ func TestSalt(b []byte) bool {
 func AddSalt(b []byte) {
 	getSaltFilterSingleton().Add(b)
 }
+
+func CheckSalt(b []byte) bool {
+	return getSaltFilterSingleton().Test(b)
+}

@@ -46,14 +46,13 @@ func Unpack(dst, pkt []byte, ciph Cipher) ([]byte, error) {
 		return nil, ErrShortPacket
 	}
 	salt := pkt[:saltSize]
-	if internal.TestSalt(salt) {
-		return nil, ErrRepeatedSalt
-	}
 	aead, err := ciph.Decrypter(salt)
 	if err != nil {
 		return nil, err
 	}
-	internal.AddSalt(salt)
+	if internal.CheckSalt(salt) {
+		return nil, ErrRepeatedSalt
+	}
 	if len(pkt) < saltSize+aead.Overhead() {
 		return nil, ErrShortPacket
 	}
